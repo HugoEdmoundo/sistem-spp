@@ -59,7 +59,7 @@
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Hapus tagihan?')">
-                                    <i class="fas fa-trash"></i>
+                                    <i class="bi bi-trash"></i> 
                                 </button>
                             </form>
                             @else

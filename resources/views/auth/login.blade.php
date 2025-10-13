@@ -63,26 +63,6 @@
                 @endif
             </div>
         </div>
-
-        <!-- Demo Credentials -->
-        <div class="material-card mt-3">
-            <div class="card-body">
-                <h6 class="card-title text-center mb-3">
-                    <i class="bi bi-key me-2"></i>Default Admin Account
-                </h6>
-                <div class="text-center">
-                    <small class="text-muted d-block">Admin:</small>
-                    <small><strong>Username:</strong> admin</small><br>
-                    <small><strong>Password:</strong> admin123</small>
-                </div>
-                <div class="mt-2 text-center">
-                    <small class="text-muted">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Murid akan dibuat oleh admin
-                    </small>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 @endsection
