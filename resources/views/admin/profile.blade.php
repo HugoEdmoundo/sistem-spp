@@ -9,10 +9,12 @@
         <div class="card">
             <div class="card-body text-center">
                 @if(auth()->user()->foto)
-                    <img src="{{ asset('storage/' . auth()->user()->foto) }}" class="rounded-circle mb-3" width="150" height="150">
+                    <img src="{{ asset('storage/' . auth()->user()->foto) }}" 
+                        class="profile-photo mb-3" 
+                        alt="Foto Profil">
                 @else
-                    <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center mb-3" 
-                        style="width: 150px; height: 150px;">
+                    <div class="d-flex align-items-center justify-content-center mb-3"
+                        style="width: 150px; height: 150px; border-radius: 50%; background-color: #198754;">
                         <i class="bi bi-person-fill text-white fs-1"></i>
                     </div>
                 @endif

@@ -57,6 +57,15 @@
           padding: 0;
         }
 
+        .profile-photo {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #198754; /* opsional: biar ada garis hijau rapi */
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.15);
+        }
+
         html {
           scroll-behavior: smooth;
         }
@@ -573,42 +582,46 @@
 
                 <!-- User Menu -->
                 <ul class="navbar-nav ms-auto">
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
-                            @if(auth()->user()->foto)
-                                <img src="{{ asset('storage/' . auth()->user()->foto) }}" class="rounded-circle me-2" width="32" height="32">
-                            @else
-                                <div class="rounded-circle bg-light d-flex align-items-center justify-content-center me-2" style="width: 32px; height: 32px;">
-                                    <i class="bi bi-person text-primary"></i>
-                                </div>
-                            @endif
-                            <span>{{ auth()->user()->nama }}</span>
-                        </a>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                @if(auth()->user()->isAdmin())
-                                    <a class="dropdown-item" href="{{ route('admin.profile') }}">
-                                        <i class="bi bi-person me-2"></i>Profile Saya
-                                    </a>
-                                @else
-                                    <a class="dropdown-item" href="{{ route('murid.profile') }}">
-                                        <i class="bi bi-person me-2"></i>Profile Saya
-                                    </a>
-                                @endif
-                            </li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li>
-                                <a class="dropdown-item text-danger" href="{{ route('logout') }}" 
-                                   onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                    <i class="bi bi-box-arrow-right me-2"></i>Logout
-                                </a>
-                                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                                    @csrf
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
-                </ul>
+                  <li class="nav-item dropdown">
+                      <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
+                          @if(auth()->user()->foto)
+                              <img src="{{ asset('storage/' . auth()->user()->foto) }}" 
+                                  alt="Foto Profil"
+                                  class="me-2"
+                                  style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid #dee2e6;">
+                          @else
+                              <div class="d-flex align-items-center justify-content-center me-2" 
+                                  style="width: 32px; height: 32px; border-radius: 50%; background-color: #f8f9fa; overflow: hidden; border: 1px solid #dee2e6;">
+                                  <i class="bi bi-person text-primary"></i>
+                              </div>
+                          @endif
+                          <span>{{ auth()->user()->nama }}</span>
+                      </a>
+                      <ul class="dropdown-menu dropdown-menu-end">
+                          <li>
+                              @if(auth()->user()->isAdmin())
+                                  <a class="dropdown-item" href="{{ route('admin.profile') }}">
+                                      <i class="bi bi-person me-2"></i>Profile Saya
+                                  </a>
+                              @else
+                                  <a class="dropdown-item" href="{{ route('murid.profile') }}">
+                                      <i class="bi bi-person me-2"></i>Profile Saya
+                                  </a>
+                              @endif
+                          </li>
+                          <li><hr class="dropdown-divider"></li>
+                          <li>
+                              <a class="dropdown-item text-danger" href="{{ route('logout') }}" 
+                                onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                  <i class="bi bi-box-arrow-right me-2"></i>Logout
+                              </a>
+                              <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                  @csrf
+                              </form>
+                          </li>
+                      </ul>
+                  </li>
+              </ul>
             </div>
             @endauth
         </div>

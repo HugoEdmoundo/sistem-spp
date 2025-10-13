@@ -101,28 +101,41 @@ class MuridController extends Controller
         $user = auth()->user();
         
         $request->validate([
-            'nama' => 'required',
+            'nama' => 'required|string|max:100',
             'email' => 'required|email|unique:users,email,' . $user->id,
-            'username' => 'required|unique:users,username,' . $user->id,
-            'password' => 'nullable|min:8|confirmed'
+            'username' => 'required|string|unique:users,username,' . $user->id,
+            'password' => 'nullable|min:8|confirmed',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
-        $data = $request->only(['nama', 'email', 'username']);
+        // Prepare data untuk update
+        $data = [
+            'nama' => $request->nama,
+            'email' => $request->email,
+            'username' => $request->username,
+        ];
         
-        if ($request->password) {
+        // Update password jika diisi
+        if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
 
+        // Handle upload foto
         if ($request->hasFile('foto')) {
-            if ($user->foto) {
-                Storage::delete($user->foto);
+            // Hapus foto lama jika ada
+            if ($user->foto && Storage::exists('public/' . $user->foto)) {
+                Storage::delete('public/' . $user->foto);
             }
-            $data['foto'] = $request->file('foto')->store('profiles', 'public');
+            
+            // Simpan foto baru
+            $fotoPath = $request->file('foto')->store('profiles', 'public');
+            $data['foto'] = $fotoPath;
         }
 
+        // Update user
         $user->update($data);
 
-        return back()->with('success', 'Profile berhasil diperbarui.');
+        return redirect()->route('murid.profile')->with('success', 'Profile berhasil diperbarui!');
     }
 
     public function pembayaranHistory()
