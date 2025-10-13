@@ -1,0 +1,369 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\Models\User;
+use App\Models\Tagihan;
+use App\Models\Pembayaran;
+use App\Models\SppSetting;
+use App\Exports\TagihanExport;
+use App\Exports\PembayaranExport;
+use App\Exports\MuridExport;
+use App\Events\PembayaranDibuat;
+use App\Events\StatusPembayaranDiupdate;
+use App\Mail\PembayaranNotification;
+use App\Mail\StatusPembayaranNotification;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Mail; // TAMBAHKAN INI
+use Maatwebsite\Excel\Facades\Excel;
+
+class AdminController extends Controller
+{
+    public function dashboard()
+    {
+        $totalMurid = User::where('role', 'murid')->where('aktif', true)->count();
+        $totalTagihanBulanIni = Tagihan::whereMonth('created_at', now()->month)
+            ->whereYear('created_at', now()->year)
+            ->sum('jumlah');
+        $totalDibayar = Tagihan::where('status', 'success')->sum('jumlah');
+        $pembayaranPending = Pembayaran::where('status', 'pending')->count();
+
+        return view('admin.dashboard', compact(
+            'totalMurid', 
+            'totalTagihanBulanIni', 
+            'totalDibayar',
+            'pembayaranPending'
+        ));
+    }
+
+    // ==================== MURID MANAGEMENT ====================
+    public function muridIndex()
+    {
+        $murid = User::where('role', 'murid')->get();
+        return view('admin.murid.index', compact('murid'));
+    }
+
+    public function muridCreate()
+    {
+        return view('admin.murid.create');
+    }
+
+    public function muridStore(Request $request)
+    {
+        $request->validate([
+            'nama' => 'required',
+            'email' => 'required|email|unique:users',
+            'username' => 'required|unique:users',
+            'nip' => 'nullable'
+        ]);
+
+        User::create([
+            'role' => 'murid',
+            'nama' => $request->nama,
+            'email' => $request->email,
+            'username' => $request->username,
+            'password' => Hash::make('123456789'),
+            'nip' => $request->nip,
+            'aktif' => true
+        ]);
+
+        return redirect()->route('admin.murid.index')->with('success', 'Murid berhasil ditambahkan.');
+    }
+
+    public function muridEdit($id)
+    {
+        $murid = User::where('role', 'murid')->findOrFail($id);
+        return view('admin.murid.edit', compact('murid'));
+    }
+
+    public function muridUpdate(Request $request, $id)
+    {
+        $murid = User::where('role', 'murid')->findOrFail($id);
+        
+        $request->validate([
+            'nama' => 'required',
+            'email' => 'required|email|unique:users,email,' . $murid->id,
+            'username' => 'required|unique:users,username,' . $murid->id,
+            'nip' => 'nullable'
+        ]);
+
+        $murid->update([
+            'nama' => $request->nama,
+            'email' => $request->email,
+            'username' => $request->username,
+            'nip' => $request->nip
+        ]);
+
+        return redirect()->route('admin.murid.index')->with('success', 'Data murid berhasil diperbarui.');
+    }
+
+    public function muridToggle($id)
+    {
+        $murid = User::where('role', 'murid')->findOrFail($id);
+        $murid->update(['aktif' => !$murid->aktif]);
+        
+        $status = $murid->aktif ? 'diaktifkan' : 'dinonaktifkan';
+        return back()->with('success', "Murid berhasil $status.");
+    }
+
+    public function resetPassword($id)
+    {
+        $murid = User::findOrFail($id);
+        $murid->update(['password' => Hash::make('123456789')]);
+        
+        return back()->with('success', 'Password berhasil direset ke 123456789');
+    }
+
+    // ==================== TAGIHAN MANAGEMENT ====================
+    public function tagihanIndex()
+    {
+        $tagihan = Tagihan::with('user')->latest()->get();
+        return view('admin.tagihan.index', compact('tagihan'));
+    }
+
+    public function tagihanCreate()
+    {
+        $murid = User::where('role', 'murid')->where('aktif', true)->get();
+        return view('admin.tagihan.create', compact('murid'));
+    }
+
+    public function tagihanStore(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required',
+            'jenis' => 'required',
+            'keterangan' => 'required',
+            'jumlah' => 'required|numeric|min:0'
+        ]);
+
+        Tagihan::create([
+            'user_id' => $request->user_id,
+            'jenis' => $request->jenis,
+            'keterangan' => $request->keterangan,
+            'bulan' => $request->bulan,
+            'tahun' => $request->tahun,
+            'jumlah' => $request->jumlah,
+            'status' => 'unpaid'
+        ]);
+
+        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil ditambahkan.');
+    }
+
+    public function tagihanDestroy($id)
+    {
+        $tagihan = Tagihan::findOrFail($id);
+        
+        // Hapus jika belum ada pembayaran
+        if ($tagihan->pembayaran) {
+            return back()->with('error', 'Tagihan tidak dapat dihapus karena sudah ada pembayaran.');
+        }
+        
+        $tagihan->delete();
+        return back()->with('success', 'Tagihan berhasil dihapus.');
+    }
+
+    // ==================== PEMBAYARAN MANAGEMENT ====================
+    public function pembayaranIndex()
+    {
+        $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
+            ->where('status', 'pending')
+            ->latest()
+            ->get();
+        return view('admin.pembayaran.index', compact('pembayaran'));
+    }
+
+    public function pembayaranHistory()
+    {
+        $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
+            ->whereIn('status', ['accepted', 'rejected'])
+            ->latest()
+            ->get();
+        return view('admin.pembayaran.history', compact('pembayaran'));
+    }
+
+    public function approvePembayaran($id)
+    {
+        $pembayaran = Pembayaran::findOrFail($id);
+        $pembayaran->update([
+            'status' => 'accepted',
+            'tanggal_proses' => now(),
+            'admin_id' => auth()->id()
+        ]);
+
+        $pembayaran->tagihan->update(['status' => 'success']);
+
+        // Trigger event dan email - COMMENT DULU UNTUK TEST
+        // event(new StatusPembayaranDiupdate($pembayaran));
+        // Mail::to($pembayaran->user->email)->send(new StatusPembayaranNotification($pembayaran));
+
+        return back()->with('success', 'Pembayaran berhasil disetujui.');
+    }
+
+    public function rejectPembayaran($id)
+    {
+        $pembayaran = Pembayaran::findOrFail($id);
+        $pembayaran->update([
+            'status' => 'rejected',
+            'tanggal_proses' => now(),
+            'admin_id' => auth()->id()
+        ]);
+
+        $pembayaran->tagihan->update(['status' => 'rejected']);
+
+        // Trigger event dan email - COMMENT DULU UNTUK TEST
+        // event(new StatusPembayaranDiupdate($pembayaran));
+        // Mail::to($pembayaran->user->email)->send(new StatusPembayaranNotification($pembayaran));
+
+        return back()->with('success', 'Pembayaran berhasil ditolak.');
+    }
+
+    // ==================== SPP SETTING ====================
+    public function sppSetting()
+    {
+        $setting = SppSetting::latest()->first();
+        return view('admin.spp-setting', compact('setting'));
+    }
+
+    public function updateSppSetting(Request $request)
+    {
+        $request->validate([
+            'nominal' => 'required|numeric',
+            'berlaku_mulai' => 'required|date'
+        ]);
+
+        SppSetting::create($request->only(['nominal', 'berlaku_mulai']));
+
+        return back()->with('success', 'Setting SPP berhasil diperbarui.');
+    }
+
+    // ==================== PROFILE ====================
+    public function profile()
+    {
+        return view('admin.profile');
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = auth()->user();
+        
+        $request->validate([
+            'nama' => 'required',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'username' => 'required|unique:users,username,' . $user->id,
+            'password' => 'nullable|min:8|confirmed'
+        ]);
+
+        $data = $request->only(['nama', 'email', 'username']);
+        
+        if ($request->password) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        if ($request->hasFile('foto')) {
+            if ($user->foto) {
+                Storage::delete($user->foto);
+            }
+            $data['foto'] = $request->file('foto')->store('profiles', 'public');
+        }
+
+        $user->update($data);
+
+        return back()->with('success', 'Profile berhasil diperbarui.');
+    }
+
+    // ==================== LAPORAN & EXPORT ====================
+    public function laporanIndex()
+    {
+        return view('admin.laporan.index');
+    }
+
+    public function exportTagihan(Request $request)
+    {
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        
+        $filename = 'laporan-tagihan-' . now()->format('Y-m-d') . '.xlsx';
+        
+        return Excel::download(new TagihanExport($startDate, $endDate), $filename);
+    }
+
+    public function exportPembayaran(Request $request)
+    {
+        $startDate = $request->get('start_date');
+        $endDate = $request->get('end_date');
+        
+        $filename = 'laporan-pembayaran-' . now()->format('Y-m-d') . '.xlsx';
+        
+        return Excel::download(new PembayaranExport($startDate, $endDate), $filename);
+    }
+
+    public function exportMurid()
+    {
+        $filename = 'data-murid-' . now()->format('Y-m-d') . '.xlsx';
+        return Excel::download(new MuridExport(), $filename);
+    }
+
+    // ==================== BACKUP DATABASE ====================
+    public function backupIndex()
+    {
+        $backups = [];
+        $files = Storage::files('backups');
+        
+        foreach ($files as $file) {
+            $backups[] = [
+                'name' => basename($file),
+                'size' => $this->formatBytes(Storage::size($file)),
+                'date' => \Carbon\Carbon::createFromTimestamp(Storage::lastModified($file))->format('d/m/Y H:i')
+            ];
+        }
+        
+        // Sort by date descending
+        usort($backups, function($a, $b) {
+            return strtotime($b['date']) - strtotime($a['date']);
+        });
+        
+        return view('admin.backup.index', compact('backups'));
+    }
+
+    public function createBackup()
+    {
+        \Artisan::call('backup:run');
+        
+        return back()->with('success', 'Backup database berhasil dibuat.');
+    }
+
+    public function downloadBackup($file)
+    {
+        $path = "backups/{$file}";
+        
+        if (!Storage::exists($path)) {
+            return back()->with('error', 'File backup tidak ditemukan.');
+        }
+        
+        return Storage::download($path);
+    }
+
+    public function deleteBackup($file)
+    {
+        $path = "backups/{$file}";
+        
+        if (Storage::exists($path)) {
+            Storage::delete($path);
+            return back()->with('success', 'Backup berhasil dihapus.');
+        }
+        
+        return back()->with('error', 'File backup tidak ditemukan.');
+    }
+
+    private function formatBytes($size, $precision = 2)
+    {
+        if ($size > 0) {
+            $base = log($size) / log(1024);
+            $suffixes = array(' bytes', ' KB', ' MB', ' GB', ' TB');
+            return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
+        }
+        
+        return '0 bytes';
+    }
+}
