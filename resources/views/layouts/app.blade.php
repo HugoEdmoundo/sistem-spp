@@ -555,6 +555,11 @@
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('admin.pengeluaran.*') ? 'active' : '' }}" href="{{ route('admin.pengeluaran.index') }}">
+                            <i class="bi bi-cash-coin me-1"></i>Pengeluaran
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {{ request()->routeIs('admin.spp-setting') ? 'active' : '' }}" href="{{ route('admin.spp-setting') }}">
                             <i class="bi bi-gear me-1"></i>Setting
                         </a>

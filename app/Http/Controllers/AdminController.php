@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Models\Tagihan;
 use App\Models\Pembayaran;
 use App\Models\SppSetting;
+use App\Models\Pengeluaran;
 use App\Exports\TagihanExport;
 use App\Exports\PembayaranExport;
 use App\Exports\MuridExport;
@@ -15,7 +16,7 @@ use App\Mail\StatusPembayaranNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Mail; // TAMBAHKAN INI
+use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
 
 class AdminController extends Controller
@@ -26,13 +27,20 @@ class AdminController extends Controller
         $totalTagihanBulanIni = Tagihan::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
             ->sum('jumlah');
-        $totalDibayar = Tagihan::where('status', 'success')->sum('jumlah');
+        
+        // TOTAL AKHIR = Total Pembayaran Diterima - Total Pengeluaran
+        $totalPembayaran = Pembayaran::where('status', 'accepted')->sum('jumlah');
+        $totalPengeluaran = Pengeluaran::sum('jumlah');
+        $totalAkhir = $totalPembayaran - $totalPengeluaran;
+        
         $pembayaranPending = Pembayaran::where('status', 'pending')->count();
 
         return view('admin.dashboard', compact(
             'totalMurid', 
             'totalTagihanBulanIni', 
-            'totalDibayar',
+            'totalAkhir',
+            'totalPembayaran',
+            'totalPengeluaran',
             'pembayaranPending'
         ));
     }
@@ -163,6 +171,87 @@ class AdminController extends Controller
         return back()->with('success', 'Tagihan berhasil dihapus.');
     }
 
+    // ==================== PENGELUARAN MANAGEMENT ====================
+    public function pengeluaranIndex()
+    {
+        $pengeluaran = Pengeluaran::with('admin')->latest()->get();
+        return view('admin.pengeluaran.index', compact('pengeluaran'));
+    }
+
+    public function pengeluaranCreate()
+    {
+        $kategori = [
+            'Bayar Listrik',
+            'Sarapan', 
+            'Bayar WiFi',
+            'Kebutuhan Osman',
+            'Other'
+        ];
+        return view('admin.pengeluaran.create', compact('kategori'));
+    }
+
+    public function pengeluaranStore(Request $request)
+    {
+        $request->validate([
+            'kategori' => 'required|string',
+            'keterangan' => 'required|string',
+            'jumlah' => 'required|numeric|min:0',
+            'tanggal' => 'required|date'
+        ]);
+
+        Pengeluaran::create([
+            'kategori' => $request->kategori,
+            'keterangan' => $request->kategori === 'Other' ? $request->keterangan_custom : $request->keterangan,
+            'jumlah' => $request->jumlah,
+            'tanggal' => $request->tanggal,
+            'admin_id' => auth()->id()
+        ]);
+
+        return redirect()->route('admin.pengeluaran.index')->with('success', 'Pengeluaran berhasil ditambahkan.');
+    }
+
+    public function pengeluaranDestroy($id)
+    {
+        $pengeluaran = Pengeluaran::findOrFail($id);
+        $pengeluaran->delete();
+
+        return back()->with('success', 'Pengeluaran berhasil dihapus.');
+    }
+    // ==================== EDIT PENGELUARAN ====================
+    public function pengeluaranEdit($id)
+    {
+        $pengeluaran = Pengeluaran::findOrFail($id);
+        $kategori = [
+            'Bayar Listrik',
+            'Sarapan', 
+            'Bayar WiFi',
+            'Kebutuhan Osman',
+            'Other'
+        ];
+        return view('admin.pengeluaran.edit', compact('pengeluaran', 'kategori'));
+    }
+
+    public function pengeluaranUpdate(Request $request, $id)
+    {
+        $request->validate([
+            'kategori' => 'required|string',
+            'keterangan' => 'required|string',
+            'jumlah' => 'required|numeric|min:0',
+            'tanggal' => 'required|date'
+        ]);
+
+        $pengeluaran = Pengeluaran::findOrFail($id);
+        $pengeluaran->update([
+            'kategori' => $request->kategori,
+            'keterangan' => $request->kategori === 'Other' ? $request->keterangan_custom : $request->keterangan,
+            'jumlah' => $request->jumlah,
+            'tanggal' => $request->tanggal,
+        ]);
+
+        return redirect()->route('admin.pengeluaran.index')->with('success', 'Pengeluaran berhasil diperbarui.');
+    }
+
+
     // ==================== PEMBAYARAN MANAGEMENT ====================
     public function pembayaranIndex()
     {
@@ -178,7 +267,7 @@ class AdminController extends Controller
         $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
             ->whereIn('status', ['accepted', 'rejected'])
             ->latest()
-            ->get();
+            ->paginate(20);
         return view('admin.pembayaran.history', compact('pembayaran'));
     }
 
@@ -191,11 +280,10 @@ class AdminController extends Controller
             'admin_id' => auth()->id()
         ]);
 
-        $pembayaran->tagihan->update(['status' => 'success']);
-
-        // Trigger event dan email - COMMENT DULU UNTUK TEST
-        // event(new StatusPembayaranDiupdate($pembayaran));
-        // Mail::to($pembayaran->user->email)->send(new StatusPembayaranNotification($pembayaran));
+        // Jika ada tagihan terkait, update status tagihan
+        if ($pembayaran->tagihan) {
+            $pembayaran->tagihan->update(['status' => 'success']);
+        }
 
         return back()->with('success', 'Pembayaran berhasil disetujui.');
     }
@@ -208,12 +296,6 @@ class AdminController extends Controller
             'tanggal_proses' => now(),
             'admin_id' => auth()->id()
         ]);
-
-        $pembayaran->tagihan->update(['status' => 'rejected']);
-
-        // Trigger event dan email - COMMENT DULU UNTUK TEST
-        // event(new StatusPembayaranDiupdate($pembayaran));
-        // Mail::to($pembayaran->user->email)->send(new StatusPembayaranNotification($pembayaran));
 
         return back()->with('success', 'Pembayaran berhasil ditolak.');
     }

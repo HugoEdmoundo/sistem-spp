@@ -1,5 +1,4 @@
 <?php
-// app/Models/Pembayaran.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,25 +9,27 @@ class Pembayaran extends Model
     use HasFactory;
 
     protected $fillable = [
-        'tagihan_id',
+        'tagihan_id', // Bisa null
         'user_id',
         'metode',
         'bukti',
         'jumlah',
         'status',
+        'keterangan',
+        'jenis_bayar',
         'tanggal_proses',
         'admin_id'
     ];
 
-    // Casting untuk dates
     protected $casts = [
         'tanggal_upload' => 'datetime',
         'tanggal_proses' => 'datetime',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'jumlah' => 'decimal:2'
     ];
 
-    // Relasi
+    // Relasi - tagihan bisa null
     public function tagihan()
     {
         return $this->belongsTo(Tagihan::class);
@@ -44,15 +45,15 @@ class Pembayaran extends Model
         return $this->belongsTo(User::class, 'admin_id');
     }
 
-    // Accessor untuk memastikan tanggal_upload selalu return Carbon
-    public function getTanggalUploadAttribute($value)
+    // Scope untuk pembayaran yang diterima
+    public function scopeDiterima($query)
     {
-        return \Carbon\Carbon::parse($value);
+        return $query->where('status', 'accepted');
     }
 
-    // Accessor untuk memastikan tanggal_proses selalu return Carbon
-    public function getTanggalProsesAttribute($value)
+    // Scope untuk pembayaran tanpa tagihan (fleksibel)
+    public function scopeTanpaTagihan($query)
     {
-        return $value ? \Carbon\Carbon::parse($value) : null;
+        return $query->whereNull('tagihan_id');
     }
 }

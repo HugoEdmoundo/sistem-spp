@@ -8,10 +8,10 @@
     <h4>Riwayat Pembayaran Saya</h4>
     <div>
         <a href="{{ route('murid.dashboard') }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Dashboard
+            <i class="bi bi-arrow-left me-2"></i> Dashboard
         </a>
         <a href="{{ route('murid.tagihan.index') }}" class="btn btn-primary">
-            <i class="fas fa-file-invoice"></i> Lihat Tagihan
+            <i class="bi bi-file-invoice me-2"></i> Lihat Tagihan
         </a>
     </div>
 </div>
@@ -23,7 +23,7 @@
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Tagihan</th>
+                        <th>Keterangan</th>
                         <th>Metode</th>
                         <th>Jumlah</th>
                         <th>Status</th>
@@ -37,7 +37,17 @@
                     @forelse($pembayaran as $index => $item)
                     <tr>
                         <td>{{ $index + 1 }}</td>
-                        <td>{{ $item->tagihan->keterangan }}</td>
+                        <td>
+                            @if($item->tagihan)
+                                {{ $item->tagihan->keterangan }}
+                                <br>
+                                <span class="badge bg-primary">Tagihan</span>
+                            @else
+                                {{ $item->keterangan ?? 'Pembayaran SPP Fleksibel' }}
+                                <br>
+                                <span class="badge bg-info">Fleksibel</span>
+                            @endif
+                        </td>
                         <td>{{ $item->metode }}</td>
                         <td>Rp {{ number_format($item->jumlah, 0, ',', '.') }}</td>
                         <td>
@@ -71,7 +81,7 @@
                     @empty
                     <tr>
                         <td colspan="9" class="text-center py-4">
-                            <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                            <i class="bi bi-history fa-3x text-muted mb-3"></i>
                             <p>Belum ada riwayat pembayaran.</p>
                         </td>
                     </tr>

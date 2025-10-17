@@ -12,6 +12,19 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Admin Routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
+
+    // Admin Routes - tambah pengeluaran
+    Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
+        
+        // Pengeluaran Management
+        Route::get('/pengeluaran', [AdminController::class, 'pengeluaranIndex'])->name('admin.pengeluaran.index');
+        Route::get('/pengeluaran/create', [AdminController::class, 'pengeluaranCreate'])->name('admin.pengeluaran.create');
+        Route::post('/pengeluaran', [AdminController::class, 'pengeluaranStore'])->name('admin.pengeluaran.store');
+        Route::get('/pengeluaran/{id}/edit', [AdminController::class, 'pengeluaranEdit'])->name('admin.pengeluaran.edit');
+        Route::put('/pengeluaran/{id}', [AdminController::class, 'pengeluaranUpdate'])->name('admin.pengeluaran.update');
+        Route::delete('/pengeluaran/{id}', [AdminController::class, 'pengeluaranDestroy'])->name('admin.pengeluaran.destroy');
+    });
+
     
     // Murid Management
     Route::get('/murid', [AdminController::class, 'muridIndex'])->name('admin.murid.index');
@@ -63,6 +76,12 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/pembayaran/history', [MuridController::class, 'pembayaranHistory'])->name('murid.pembayaran.history');
     Route::get('/profile', [MuridController::class, 'profile'])->name('murid.profile');
     Route::post('/profile', [MuridController::class, 'updateProfile'])->name('murid.profile.update');
+
+    // Murid Routes - tambah bayar SPP fleksibel
+    Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
+        // ... routes lainnya ...
+        Route::post('/bayar-spp', [MuridController::class, 'bayarSpp'])->name('murid.bayar.spp');
+    });
 });
 
 

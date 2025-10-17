@@ -3,12 +3,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Tagihan;
 use App\Models\Pembayaran;
+use App\Models\SppSetting;
 use App\Events\PembayaranDibuat;
 use App\Mail\PembayaranNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Mail; // TAMBAHKAN INI
+use Illuminate\Support\Facades\Mail;
 
 class MuridController extends Controller
 {
@@ -16,29 +17,37 @@ class MuridController extends Controller
     {
         $user = auth()->user();
         
+        // Hitung statistik
         $totalTagihan = Tagihan::where('user_id', $user->id)
             ->whereIn('status', ['unpaid', 'rejected'])
             ->sum('jumlah');
             
-        $totalDibayar = Tagihan::where('user_id', $user->id)
-            ->where('status', 'success')
+        $totalDibayar = Pembayaran::where('user_id', $user->id)
+            ->where('status', 'accepted')
             ->sum('jumlah');
             
         $tagihanPending = Tagihan::where('user_id', $user->id)
             ->where('status', 'pending')
             ->count();
-            
-        $tagihan = Tagihan::where('user_id', $user->id)
+
+        // Ambil nominal SPP saat ini
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+
+        // Ambil tagihan terbaru untuk ditampilkan - GUNAKAN VARIABLE YANG BERBEDA
+        $tagihanTerbaru = Tagihan::where('user_id', $user->id)
             ->latest()
-            ->take(10)
+            ->take(5)
             ->get();
 
-        return view('murid.dashboard', compact(
-            'totalTagihan', 
-            'totalDibayar', 
-            'tagihanPending',
-            'tagihan'
-        ));
+        // Return dengan array yang jelas
+        return view('murid.dashboard', [
+            'totalTagihan' => $totalTagihan,
+            'totalDibayar' => $totalDibayar,
+            'tagihanPending' => $tagihanPending,
+            'nominalSpp' => $nominalSpp,
+            'tagihan' => $tagihanTerbaru // GUNAKAN VARIABLE YANG SAMA DENGAN VIEW
+        ]);
     }
 
     public function tagihanIndex()
@@ -50,6 +59,53 @@ class MuridController extends Controller
         return view('murid.tagihan.index', compact('tagihan'));
     }
 
+    public function bayarSpp(Request $request)
+    {
+        $request->validate([
+            'bulan_mulai' => 'required|integer|min:1|max:12',
+            'bulan_akhir' => 'required|integer|min:1|max:12',
+            'tahun' => 'required|integer',
+            'jumlah' => 'required|numeric|min:0',
+            'metode' => 'required|string',
+            'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
+            'keterangan' => 'required|string'
+        ]);
+
+        // Validasi bulan
+        if ($request->bulan_mulai > $request->bulan_akhir) {
+            return back()->withErrors(['bulan_akhir' => 'Bulan akhir harus lebih besar atau sama dengan bulan mulai.']);
+        }
+
+        $user = auth()->user();
+        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+        // Buat pembayaran tanpa tagihan
+        $pembayaran = Pembayaran::create([
+            'tagihan_id' => null,
+            'user_id' => $user->id,
+            'metode' => $request->metode,
+            'bukti' => $buktiPath,
+            'jumlah' => $request->jumlah,
+            'status' => 'pending',
+            'keterangan' => $request->keterangan,
+            'jenis_bayar' => 'lunas',
+            'tanggal_upload' => now()
+        ]);
+
+        // Trigger event dan email - COMMENT DULU UNTUK TEST
+            // event(new PembayaranDibuat($pembayaran));
+            
+            // Kirim email ke admin - COMMENT DULU UNTUK TEST
+            // $adminUsers = \App\Models\User::where('role', 'admin')->get();
+            // foreach ($adminUsers as $admin) {
+            //     Mail::to($admin->email)->send(new PembayaranNotification($pembayaran));
+            // }
+
+
+        return back()->with('success', 'Pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
+    }
+     
+    
     public function uploadBukti(Request $request, $id)
     {
         $tagihan = Tagihan::where('user_id', auth()->id())->findOrFail($id);
@@ -74,10 +130,16 @@ class MuridController extends Controller
             'metode' => $request->metode,
             'bukti' => $buktiPath,
             'jumlah' => $tagihan->jumlah,
-            'status' => 'pending'
+            'status' => 'pending',
+            'keterangan' => "Bayar tagihan: {$tagihan->keterangan}",
+            'jenis_bayar' => 'lunas',
+            'tanggal_upload' => now()
         ]);
 
         $tagihan->update(['status' => 'pending']);
+
+        return back()->with('success', 'Bukti pembayaran berhasil diupload. Menunggu verifikasi admin.');
+    }
 
         // Trigger event dan email - COMMENT DULU UNTUK TEST
         // event(new PembayaranDibuat($pembayaran));
@@ -87,9 +149,6 @@ class MuridController extends Controller
         // foreach ($adminUsers as $admin) {
         //     Mail::to($admin->email)->send(new PembayaranNotification($pembayaran));
         // }
-
-        return back()->with('success', 'Bukti pembayaran berhasil diupload. Menunggu verifikasi admin.');
-    }
 
     public function profile()
     {

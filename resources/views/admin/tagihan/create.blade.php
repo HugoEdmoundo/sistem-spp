@@ -25,7 +25,6 @@
                     <label>Jenis Tagihan</label>
                     <select name="jenis" class="form-control" required>
                         <option value="custom">Custom</option>
-                        <option value="spp">SPP</option>
                     </select>
                 </div>
                 <div class="col-md-12 mb-3">

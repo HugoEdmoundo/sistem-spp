@@ -7,7 +7,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4>Pembayaran Menunggu Verifikasi</h4>
     <a href="{{ route('admin.pembayaran.history') }}" class="btn btn-secondary">
-        <i class="fas fa-history"></i> Riwayat Pembayaran
+        <i class="bi bi-history me-2"></i> Riwayat Pembayaran
     </a>
 </div>
 
@@ -20,7 +20,7 @@
                     <tr>
                         <th>#</th>
                         <th>Murid</th>
-                        <th>Tagihan</th>
+                        <th>Keterangan</th>
                         <th>Metode</th>
                         <th>Jumlah</th>
                         <th>Bukti</th>
@@ -33,7 +33,17 @@
                     <tr>
                         <td>{{ $index + 1 }}</td>
                         <td>{{ $item->user->nama }}</td>
-                        <td>{{ $item->tagihan->keterangan }}</td>
+                        <td>
+                            @if($item->tagihan)
+                                {{ $item->tagihan->keterangan }}
+                                <br>
+                                <small class="text-muted">(Tagihan)</small>
+                            @else
+                                {{ $item->keterangan ?? 'Pembayaran SPP Fleksibel' }}
+                                <br>
+                                <small class="text-muted">(Fleksibel)</small>
+                            @endif
+                        </td>
                         <td>{{ $item->metode }}</td>
                         <td>Rp {{ number_format($item->jumlah, 0, ',', '.') }}</td>
                         <td>
@@ -51,13 +61,13 @@
                                 <form action="{{ route('admin.pembayaran.approve', $item->id) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Setujui pembayaran?')">
-                                        <i class="fas fa-check"></i> Approve
+                                        <i class="bi bi-check"></i> Approve
                                     </button>
                                 </form>
                                 <form action="{{ route('admin.pembayaran.reject', $item->id) }}" method="POST" class="d-inline">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Tolak pembayaran?')">
-                                        <i class="fas fa-times"></i> Reject
+                                        <i class="bi bi-x"></i> Reject
                                     </button>
                                 </form>
                             </div>
@@ -69,7 +79,7 @@
         </div>
         @else
         <div class="text-center py-4">
-            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <i class="bi bi-check-circle fa-3x text-success mb-3"></i>
             <p>Tidak ada pembayaran yang menunggu verifikasi.</p>
         </div>
         @endif

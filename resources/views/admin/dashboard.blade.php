@@ -20,6 +20,7 @@
 </div>
 
 <!-- Stats Cards -->
+<!-- Ganti bagian stats cards -->
 <div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stat-card primary">
@@ -42,10 +43,10 @@
     <div class="col-xl-3 col-md-6 mb-4">
         <div class="stat-card info">
             <div class="stat-icon">
-                <i class="bi bi-check-circle"></i>
+                <i class="bi bi-cash-stack"></i>
             </div>
-            <div class="stat-value">Rp {{ number_format($totalDibayar, 0, ',', '.') }}</div>
-            <div class="stat-label">Total Dibayar</div>
+            <div class="stat-value">Rp {{ number_format($totalAkhir, 0, ',', '.') }}</div>
+            <div class="stat-label">Total Akhir</div>
         </div>
     </div>
     <div class="col-xl-3 col-md-6 mb-4">
@@ -55,6 +56,40 @@
             </div>
             <div class="stat-value">{{ $pembayaranPending }}</div>
             <div class="stat-label">Menunggu Verifikasi</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tambah card untuk detail keuangan -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="material-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Ringkasan Keuangan</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="text-success">
+                            <div class="h4">Rp {{ number_format($totalPembayaran, 0, ',', '.') }}</div>
+                            <small>Total Pemasukan</small>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="text-danger">
+                            <div class="h4">Rp {{ number_format($totalPengeluaran, 0, ',', '.') }}</div>
+                            <small>Total Pengeluaran</small>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="text-center">
+                    <div class="h3 {{ $totalAkhir >= 0 ? 'text-success' : 'text-danger' }}">
+                        Rp {{ number_format($totalAkhir, 0, ',', '.') }}
+                    </div>
+                    <small>Saldo Akhir</small>
+                </div>
+            </div>
         </div>
     </div>
 </div>
