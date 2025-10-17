@@ -9,6 +9,7 @@ use App\Models\Pengeluaran;
 use App\Exports\TagihanExport;
 use App\Exports\PembayaranExport;
 use App\Exports\MuridExport;
+use App\Models\Notification;
 use App\Events\PembayaranDibuat;
 use App\Events\StatusPembayaranDiupdate;
 use App\Mail\PembayaranNotification;
@@ -16,8 +17,10 @@ use App\Mail\StatusPembayaranNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
+
 
 class AdminController extends Controller
 {
@@ -124,10 +127,24 @@ class AdminController extends Controller
     }
 
     // ==================== TAGIHAN MANAGEMENT ====================
+    // ==================== TAGIHAN MANAGEMENT ====================
     public function tagihanIndex()
     {
         $tagihan = Tagihan::with('user')->latest()->get();
-        return view('admin.tagihan.index', compact('tagihan'));
+        
+        // Hitung statistik
+        $totalTagihan = Tagihan::count();
+        $tagihanSuccess = Tagihan::where('status', 'success')->count();
+        $tagihanPending = Tagihan::where('status', 'pending')->count();
+        $tagihanUnpaid = Tagihan::where('status', 'unpaid')->count();
+
+        return view('admin.tagihan.index', compact(
+            'tagihan', 
+            'totalTagihan',
+            'tagihanSuccess', 
+            'tagihanPending', 
+            'tagihanUnpaid'
+        ));
     }
 
     public function tagihanCreate()
@@ -139,38 +156,73 @@ class AdminController extends Controller
     public function tagihanStore(Request $request)
     {
         $request->validate([
-            'user_id' => 'required',
-            'jenis' => 'required',
-            'keterangan' => 'required',
-            'jumlah' => 'required|numeric|min:0'
+            'user_id' => 'required|array',
+            'user_id.*' => 'exists:users,id',
+            'jenis' => 'required|in:spp,custom',
+            'keterangan' => 'required|string|max:255',
+            'jumlah' => 'required|numeric|min:0',
+            'bulan' => 'nullable|integer|between:1,12',
+            'tahun' => 'nullable|integer'
         ]);
 
-        Tagihan::create([
-            'user_id' => $request->user_id,
+        $createdCount = 0;
+        foreach ($request->user_id as $userId) {
+            Tagihan::create([
+                'user_id' => $userId,
+                'jenis' => $request->jenis,
+                'keterangan' => $request->keterangan,
+                'jumlah' => $request->jumlah,
+                'bulan' => $request->bulan,
+                'tahun' => $request->tahun,
+                'status' => 'unpaid'
+            ]);
+            $createdCount++;
+        }
+
+        $message = $createdCount > 1 
+            ? "Tagihan berhasil dibuat untuk {$createdCount} murid." 
+            : "Tagihan berhasil ditambahkan.";
+
+        return redirect()->route('admin.tagihan.index')->with('success', $message);
+    }
+
+    public function tagihanEdit(Tagihan $tagihan)
+    {
+        return view('admin.tagihan.edit', compact('tagihan'));
+    }
+
+    public function tagihanUpdate(Request $request, Tagihan $tagihan)
+    {
+        $request->validate([
+            'jenis' => 'required|in:spp,custom',
+            'keterangan' => 'required|string|max:255',
+            'jumlah' => 'required|numeric|min:0',
+            'bulan' => 'nullable|integer|between:1,12',
+            'tahun' => 'nullable|integer'
+        ]);
+
+        $tagihan->update([
             'jenis' => $request->jenis,
             'keterangan' => $request->keterangan,
-            'bulan' => $request->bulan,
-            'tahun' => $request->tahun,
             'jumlah' => $request->jumlah,
-            'status' => 'unpaid'
+            'bulan' => $request->bulan,
+            'tahun' => $request->tahun
         ]);
 
-        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil ditambahkan.');
+        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil diperbarui.');
     }
 
-    public function tagihanDestroy($id)
+    public function tagihanDestroy(Tagihan $tagihan)
     {
-        $tagihan = Tagihan::findOrFail($id);
-        
-        // Hapus jika belum ada pembayaran
         if ($tagihan->pembayaran) {
-            return back()->with('error', 'Tagihan tidak dapat dihapus karena sudah ada pembayaran.');
+            return redirect()->route('admin.tagihan.index')
+                ->with('error', 'Tidak dapat menghapus tagihan yang sudah ada pembayaran!');
         }
-        
-        $tagihan->delete();
-        return back()->with('success', 'Tagihan berhasil dihapus.');
-    }
 
+        $tagihan->delete();
+        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil dihapus!');
+    }
+    
     // ==================== PENGELUARAN MANAGEMENT ====================
     public function pengeluaranIndex()
     {
@@ -253,37 +305,65 @@ class AdminController extends Controller
 
 
     // ==================== PEMBAYARAN MANAGEMENT ====================
+    // Di method pembayaranIndex
     public function pembayaranIndex()
     {
         $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
-            ->where('status', 'pending')
+            ->pending()
             ->latest()
             ->get();
+
         return view('admin.pembayaran.index', compact('pembayaran'));
     }
 
+    // Di method pembayaranHistory
     public function pembayaranHistory()
     {
         $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
             ->whereIn('status', ['accepted', 'rejected'])
             ->latest()
             ->paginate(20);
-        return view('admin.pembayaran.history', compact('pembayaran'));
+
+        // Hitung jumlah pembayaran pending
+        $pembayaranPending = Pembayaran::where('status', 'pending')->count();
+
+        return view('admin.pembayaran.history', compact('pembayaran', 'pembayaranPending'));
     }
 
     public function approvePembayaran($id)
     {
-        $pembayaran = Pembayaran::findOrFail($id);
-        $pembayaran->update([
-            'status' => 'accepted',
-            'tanggal_proses' => now(),
-            'admin_id' => auth()->id()
-        ]);
+        DB::transaction(function () use ($id) {
+            $pembayaran = Pembayaran::with('tagihan')->findOrFail($id);
+            
+            $pembayaran->update([
+                'status' => 'accepted',
+                'tanggal_proses' => now(),
+                'admin_id' => auth()->id()
+            ]);
 
-        // Jika ada tagihan terkait, update status tagihan
-        if ($pembayaran->tagihan) {
-            $pembayaran->tagihan->update(['status' => 'success']);
-        }
+            // Jika ada tagihan terkait, update status tagihan
+            if ($pembayaran->tagihan) {
+                $pembayaran->tagihan->update(['status' => 'success']);
+            }
+
+            // Buat notifikasi untuk murid
+            Notification::create([
+                'user_id' => $pembayaran->user_id,
+                'type' => 'pembayaran_diterima',
+                'title' => 'Pembayaran Diterima',
+                'message' => "Pembayaran Anda sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . " telah diterima",
+                'data' => [
+                    'pembayaran_id' => $pembayaran->id,
+                    'jumlah' => $pembayaran->jumlah,
+                    'status' => 'accepted'
+                ],
+                'related_type' => 'App\Models\Pembayaran',
+                'related_id' => $pembayaran->id
+            ]);
+
+            // Kirim event realtime ke murid
+            broadcast(new StatusPembayaranDiupdate($pembayaran));
+        });
 
         return back()->with('success', 'Pembayaran berhasil disetujui.');
     }
@@ -291,13 +371,39 @@ class AdminController extends Controller
     public function rejectPembayaran($id)
     {
         $pembayaran = Pembayaran::findOrFail($id);
+        
         $pembayaran->update([
             'status' => 'rejected',
             'tanggal_proses' => now(),
             'admin_id' => auth()->id()
         ]);
 
+        // Buat notifikasi untuk murid
+        Notification::create([
+            'user_id' => $pembayaran->user_id,
+            'type' => 'pembayaran_ditolak',
+            'title' => 'Pembayaran Ditolak',
+            'message' => "Pembayaran Anda sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . " ditolak. Silakan hubungi admin.",
+            'data' => [
+                'pembayaran_id' => $pembayaran->id,
+                'jumlah' => $pembayaran->jumlah,
+                'status' => 'rejected'
+            ],
+            'related_type' => 'App\Models\Pembayaran',
+            'related_id' => $pembayaran->id
+        ]);
+
+        // Kirim event realtime ke murid
+        broadcast(new StatusPembayaranDiupdate($pembayaran));
+
         return back()->with('success', 'Pembayaran berhasil ditolak.');
+    }
+
+    // Detail pembayaran
+    public function showPembayaran($id)
+    {
+        $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])->findOrFail($id);
+        return view('admin.pembayaran.show', compact('pembayaran'));
     }
 
     // ==================== SPP SETTING ====================
@@ -352,6 +458,76 @@ class AdminController extends Controller
         $user->update($data);
 
         return back()->with('success', 'Profile berhasil diperbarui.');
+    }
+
+    // ==================== PEMBAYARAN MANUAL ====================
+    public function pembayaranManualCreate()
+    {
+        $murid = User::where('role', 'murid')->where('aktif', true)->get();
+        $tagihan = Tagihan::where('status', 'unpaid')->get();
+        
+        return view('admin.pembayaran.manual-create', compact('murid', 'tagihan'));
+    }
+
+    public function pembayaranManualStore(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'tagihan_id' => 'nullable|exists:tagihan,id',
+            'jenis_bayar' => 'required|string',
+            'keterangan' => 'required|string',
+            'jumlah' => 'required|numeric|min:0',
+            'metode' => 'required|string',
+            'tanggal_bayar' => 'required|date'
+        ]);
+
+        DB::transaction(function () use ($request) {
+            // Buat pembayaran TANPA bukti
+            $pembayaran = Pembayaran::create([
+                'user_id' => $request->user_id,
+                'tagihan_id' => $request->tagihan_id,
+                'jenis_bayar' => $request->jenis_bayar,
+                'keterangan' => $request->keterangan,
+                'jumlah' => $request->jumlah,
+                'metode' => $request->metode,
+                'bukti' => null, // Tidak ada bukti untuk pembayaran manual
+                'status' => 'accepted', // Langsung diterima
+                'tanggal_proses' => now(),
+                'admin_id' => auth()->id(),
+                'catatan_admin' => $request->catatan_admin
+            ]);
+
+            // Update status tagihan jika ada tagihan terkait
+            if ($request->tagihan_id) {
+                $tagihan = Tagihan::find($request->tagihan_id);
+                if ($tagihan) {
+                    $tagihan->update(['status' => 'success']);
+                }
+            }
+
+            // Buat notifikasi untuk murid
+            Notification::create([
+                'user_id' => $request->user_id,
+                'type' => 'pembayaran_manual',
+                'title' => 'Pembayaran Manual',
+                'message' => "Admin telah mencatat pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " untuk " . $request->keterangan,
+                'data' => [
+                    'pembayaran_id' => $pembayaran->id,
+                    'jumlah' => $request->jumlah,
+                    'keterangan' => $request->keterangan,
+                    'metode' => $request->metode
+                ],
+                'related_type' => 'App\Models\Pembayaran',
+                'related_id' => $pembayaran->id
+            ]);
+
+            // Kirim event realtime ke murid
+            if (class_exists('App\Events\PembayaranManualDibuat')) {
+                broadcast(new PembayaranManualDibuat($pembayaran));
+            }
+        });
+
+        return redirect()->route('admin.pembayaran.history')->with('success', 'Pembayaran manual berhasil dicatat.');
     }
 
     // ==================== LAPORAN & EXPORT ====================

@@ -36,14 +36,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::post('/murid/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admin.murid.reset-password');
     
     // Tagihan Management
-    Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('admin.tagihan.index');
-    Route::get('/tagihan/create', [AdminController::class, 'tagihanCreate'])->name('admin.tagihan.create');
-    Route::post('/tagihan', [AdminController::class, 'tagihanStore'])->name('admin.tagihan.store');
-    Route::delete('/tagihan/{id}', [AdminController::class, 'tagihanDestroy'])->name('admin.tagihan.destroy');
+    Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('tagihan.index');
+    Route::get('/tagihan/create', [AdminController::class, 'tagihanCreate'])->name('tagihan.create');
+    Route::post('/tagihan', [AdminController::class, 'tagihanStore'])->name('tagihan.store');
+    Route::get('/tagihan/{tagihan}/edit', [AdminController::class, 'tagihanEdit'])->name('tagihan.edit');
+    Route::put('/tagihan/{tagihan}', [AdminController::class, 'tagihanUpdate'])->name('tagihan.update');
+    Route::delete('/tagihan/{tagihan}', [AdminController::class, 'tagihanDestroy'])->name('tagihan.destroy');
     
     // Pembayaran Management
     Route::get('/pembayaran', [AdminController::class, 'pembayaranIndex'])->name('admin.pembayaran.index');
     Route::get('/pembayaran/history', [AdminController::class, 'pembayaranHistory'])->name('admin.pembayaran.history');
+    Route::get('/pembayaran/{id}', [AdminController::class, 'showPembayaran'])->name('admin.pembayaran.show');
     Route::post('/pembayaran/{id}/approve', [AdminController::class, 'approvePembayaran'])->name('admin.pembayaran.approve');
     Route::post('/pembayaran/{id}/reject', [AdminController::class, 'rejectPembayaran'])->name('admin.pembayaran.reject');
     
@@ -54,6 +57,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     // Profile
     Route::get('/profile', [AdminController::class, 'profile'])->name('admin.profile');
     Route::post('/profile', [AdminController::class, 'updateProfile'])->name('admin.profile.update');
+
+    // Pembayaran Manual
+    Route::get('/admin/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
+    Route::post('/admin/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
     
     // Laporan & Export
     Route::get('/laporan', [AdminController::class, 'laporanIndex'])->name('admin.laporan.index');

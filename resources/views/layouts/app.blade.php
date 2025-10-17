@@ -33,8 +33,8 @@
           --gray: #95a5a6;
           --dark-gray: #7f8c8d;
           --light-gray: #bdc3c7;
-          --font-primary: \"Poppins\", sans-serif;
-          --font-secondary: \"Montserrat\", sans-serif;
+          --font-primary: "Poppins", sans-serif;
+          --font-secondary: "Montserrat", sans-serif;
           --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
           --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
           --shadow-lg: 0 1rem 3rem rgba(0, 0, 0, 0.175);
@@ -104,6 +104,218 @@
 
         ul, ol {
           padding-left: 1.5rem;
+        }
+
+        /* ================ LAYOUT ================ */
+        .app-container {
+          display: flex;
+          min-height: 100vh;
+        }
+
+        /* ================ SIDEBAR ================ */
+        .sidebar {
+          width: 280px;
+          background: linear-gradient(180deg, var(--secondary), var(--primary));
+          color: white;
+          transition: var(--transition);
+          position: fixed;
+          height: 100vh;
+          overflow-y: auto;
+          z-index: 1000;
+          box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+          transform: translateX(0);
+        }
+
+        .sidebar-header {
+          padding: 1.5rem 1.25rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+        }
+
+        .sidebar-header .brand {
+          font-weight: 700;
+          font-size: 1.5rem;
+          color: white;
+          display: flex;
+          align-items: center;
+        }
+
+        .sidebar-header .brand i {
+          margin-right: 0.5rem;
+        }
+
+        .sidebar-toggle {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 1.25rem;
+          cursor: pointer;
+          display: none;
+        }
+
+        .sidebar-nav {
+          padding: 1rem 0;
+          flex: 1;
+        }
+
+        .nav-section {
+          margin-bottom: 1.5rem;
+        }
+
+        .nav-section-title {
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          padding: 0 1.25rem;
+          margin-bottom: 0.5rem;
+          color: rgba(255, 255, 255, 0.6);
+          font-weight: 600;
+        }
+
+        .nav-item {
+          margin-bottom: 0.25rem;
+        }
+
+        .nav-link {
+          display: flex;
+          align-items: center;
+          padding: 0.75rem 1.25rem;
+          color: rgba(255, 255, 255, 0.85);
+          transition: var(--transition);
+          border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+          background: rgba(255, 255, 255, 0.1);
+          color: white;
+          border-left-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-link.active {
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
+          border-left-color: var(--accent);
+        }
+
+        .nav-link i {
+          margin-right: 0.75rem;
+          font-size: 1.1rem;
+          width: 20px;
+          text-align: center;
+        }
+
+        .nav-badge {
+          margin-left: auto;
+          background: var(--danger);
+          color: white;
+          border-radius: 50px;
+          padding: 0.25rem 0.5rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+
+        .sidebar-footer {
+          padding: 1.25rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          margin-top: auto;
+        }
+
+        .user-profile {
+          display: flex;
+          align-items: center;
+        }
+
+        .user-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          object-fit: cover;
+          margin-right: 0.75rem;
+          border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-info {
+          flex: 1;
+        }
+
+        .user-name {
+          font-weight: 600;
+          font-size: 0.9rem;
+          margin-bottom: 0.1rem;
+        }
+
+        .user-role {
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .user-dropdown {
+          background: none;
+          border: none;
+          color: rgba(255, 255, 255, 0.7);
+          cursor: pointer;
+          transition: var(--transition);
+        }
+
+        .user-dropdown:hover {
+          color: white;
+        }
+
+        /* ================ MAIN CONTENT ================ */
+        .main-content {
+          flex: 1;
+          margin-left: 280px;
+          transition: var(--transition);
+          min-height: 100vh;
+          display: flex;
+          flex-direction: column;
+          width: calc(100% - 280px);
+        }
+
+        .top-navbar {
+          background: white;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+          padding: 1rem 1.5rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+        }
+
+        .page-title h1 {
+          margin: 0;
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: var(--dark);
+        }
+
+        .page-title .breadcrumb {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: flex;
+          font-size: 0.875rem;
+          color: var(--muted);
+        }
+
+        .page-title .breadcrumb li:not(:last-child)::after {
+          content: "/";
+          margin: 0 0.5rem;
+        }
+
+        .top-nav-actions {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .content-wrapper {
+          flex: 1;
+          padding: 1.5rem;
         }
 
         /* ================ MATERIAL DESIGN COMPONENTS ================ */
@@ -223,38 +435,6 @@
         .btn-outline-primary:hover {
           background-color: var(--primary);
           color: white;
-        }
-
-        /* Navigation */
-        .material-navbar {
-          background: linear-gradient(135deg, var(--secondary), var(--primary));
-          box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-          padding: 0.75rem 0;
-        }
-
-        .material-navbar .navbar-brand {
-          font-weight: 700;
-          font-size: 1.5rem;
-          color: white !important;
-        }
-
-        .material-navbar .nav-link {
-          color: rgba(255, 255, 255, 0.9) !important;
-          font-weight: 500;
-          padding: 0.5rem 1rem;
-          border-radius: var(--border-radius);
-          margin: 0 0.25rem;
-          transition: var(--transition);
-        }
-
-        .material-navbar .nav-link:hover {
-          color: white !important;
-          background: rgba(255, 255, 255, 0.1);
-        }
-
-        .material-navbar .nav-link.active {
-          background: rgba(255, 255, 255, 0.2);
-          color: white !important;
         }
 
         /* Badges */
@@ -493,8 +673,159 @@
           100% { transform: rotate(360deg); }
         }
 
+        /* Mobile Toggle Button */
+        .mobile-toggle {
+          display: none;
+          background: var(--primary);
+          color: white;
+          border: none;
+          border-radius: 5px;
+          padding: 0.5rem 0.75rem;
+          font-size: 1.25rem;
+          cursor: pointer;
+          margin-right: 1rem;
+        }
+
         /* Responsive */
+        @media (max-width: 1200px) {
+          .sidebar {
+            width: 70px;
+            overflow: visible;
+          }
+          
+          .sidebar-header .brand span,
+          .nav-section-title,
+          .nav-link span,
+          .nav-badge,
+          .user-info,
+          .user-dropdown {
+            display: none;
+          }
+          
+          .sidebar-header {
+            justify-content: center;
+            padding: 1rem;
+          }
+          
+          .sidebar-toggle {
+            display: block;
+            position: absolute;
+            right: -40px;
+            top: 15px;
+            background: var(--primary);
+            width: 40px;
+            height: 40px;
+            border-radius: 0 5px 5px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .nav-link {
+            justify-content: center;
+            padding: 0.75rem;
+            border-left: none;
+            border-right: 3px solid transparent;
+          }
+          
+          .nav-link.active {
+            border-left: none;
+            border-right-color: var(--accent);
+          }
+          
+          .nav-link i {
+            margin-right: 0;
+            font-size: 1.25rem;
+          }
+          
+          .sidebar-footer {
+            padding: 1rem;
+          }
+          
+          .user-profile {
+            justify-content: center;
+          }
+          
+          .user-avatar {
+            margin-right: 0;
+            width: 36px;
+            height: 36px;
+          }
+          
+          .main-content {
+            margin-left: 70px;
+            width: calc(100% - 70px);
+          }
+          
+          .sidebar.expanded {
+            width: 280px;
+            z-index: 1100;
+          }
+          
+          .sidebar.expanded .brand span,
+          .sidebar.expanded .nav-section-title,
+          .sidebar.expanded .nav-link span,
+          .sidebar.expanded .nav-badge,
+          .sidebar.expanded .user-info,
+          .sidebar.expanded .user-dropdown {
+            display: block;
+          }
+          
+          .sidebar.expanded .nav-link {
+            justify-content: flex-start;
+            padding: 0.75rem 1.25rem;
+            border-right: none;
+            border-left: 3px solid transparent;
+          }
+          
+          .sidebar.expanded .nav-link.active {
+            border-right: none;
+            border-left-color: var(--accent);
+          }
+          
+          .sidebar.expanded .nav-link i {
+            margin-right: 0.75rem;
+          }
+          
+          .sidebar.expanded .sidebar-header {
+            justify-content: space-between;
+            padding: 1.5rem 1.25rem;
+          }
+          
+          .sidebar.expanded .user-profile {
+            justify-content: flex-start;
+          }
+          
+          .sidebar.expanded .user-avatar {
+            margin-right: 0.75rem;
+          }
+          
+          .main-content.sidebar-expanded {
+            margin-left: 280px;
+            width: calc(100% - 280px);
+          }
+        }
+
         @media (max-width: 768px) {
+          .mobile-toggle {
+            display: block;
+          }
+          
+          .sidebar {
+            width: 280px;
+            transform: translateX(-100%);
+            z-index: 1100;
+          }
+          
+          .sidebar.expanded {
+            transform: translateX(0);
+          }
+          
+          .main-content {
+            margin-left: 0;
+            width: 100%;
+          }
+          
           .material-card .card-body {
             padding: 1rem;
           }
@@ -506,6 +837,30 @@
           .stat-card .stat-value {
             font-size: 1.5rem;
           }
+          
+          .content-wrapper {
+            padding: 1rem;
+          }
+          
+          .top-navbar {
+            padding: 1rem;
+          }
+          
+          /* Overlay untuk mobile */
+          .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            display: none;
+          }
+          
+          .sidebar-overlay.active {
+            display: block;
+          }
         }
         ' !!}
     </style>
@@ -513,153 +868,265 @@
     @stack('styles')
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg material-navbar">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ auth()->check() ? (auth()->user()->isAdmin() ? route('admin.dashboard') : route('murid.dashboard')) : route('login') }}">
-                <i class="bi bi-wallet2 me-2"></i>SPP App
-            </a>
+    <!-- App Container -->
+    <div class="app-container">
+        <!-- Sidebar Overlay for Mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+        
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="{{ auth()->check() ? (auth()->user()->isAdmin() ? route('admin.dashboard') : route('murid.dashboard')) : route('login') }}" class="brand">
+                    <i class="bi bi-wallet2"></i>
+                    <span>SPP App</span>
+                </a>
+            </div>
 
             @auth
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbarNav">
-                @if(auth()->user()->isAdmin())
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
-                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.murid.*') ? 'active' : '' }}" href="{{ route('admin.murid.index') }}">
-                            <i class="bi bi-people me-1"></i>Murid
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.tagihan.*') ? 'active' : '' }}" href="{{ route('admin.tagihan.index') }}">
-                            <i class="bi bi-receipt me-1"></i>Tagihan
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.pembayaran.*') ? 'active' : '' }}" href="{{ route('admin.pembayaran.index') }}">
-                            <i class="bi bi-credit-card me-1"></i>Pembayaran
-                            @php
-                                $pendingCount = $pembayaranPendingCount ?? \App\Models\Pembayaran::where('status', 'pending')->count();
-                            @endphp
-                            @if($pendingCount > 0)
-                            <span class="badge bg-danger ms-1">{{ $pendingCount }}</span>
-                            @endif
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.pengeluaran.*') ? 'active' : '' }}" href="{{ route('admin.pengeluaran.index') }}">
-                            <i class="bi bi-cash-coin me-1"></i>Pengeluaran
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('admin.spp-setting') ? 'active' : '' }}" href="{{ route('admin.spp-setting') }}">
-                            <i class="bi bi-gear me-1"></i>Setting
-                        </a>
-                    </li>
-                </ul>
-                @else
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
-                            <i class="bi bi-speedometer2 me-1"></i>Dashboard
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
-                            <i class="bi bi-receipt me-1"></i>Tagihan Saya
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
-                            <i class="bi bi-clock-history me-1"></i>Riwayat
-                        </a>
-                    </li>
-                </ul>
-                @endif
-
-                <!-- User Menu -->
-                <ul class="navbar-nav ms-auto">
-                  <li class="nav-item dropdown">
-                      <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
-                          @if(auth()->user()->foto)
-                              <img src="{{ asset('storage/' . auth()->user()->foto) }}" 
-                                  alt="Foto Profil"
-                                  class="me-2"
-                                  style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 1px solid #dee2e6;">
-                          @else
-                              <div class="d-flex align-items-center justify-content-center me-2" 
-                                  style="width: 32px; height: 32px; border-radius: 50%; background-color: #f8f9fa; overflow: hidden; border: 1px solid #dee2e6;">
-                                  <i class="bi bi-person text-primary"></i>
-                              </div>
-                          @endif
-                          <span>{{ auth()->user()->nama }}</span>
+            <nav class="sidebar-nav">
+              @if(auth()->user()->isAdmin())
+              <div class="nav-section">
+                  <div class="nav-section-title">Menu Utama</div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
+                          <i class="bi bi-speedometer2"></i>
+                          <span>Dashboard</span>
                       </a>
-                      <ul class="dropdown-menu dropdown-menu-end">
-                          <li>
-                              @if(auth()->user()->isAdmin())
-                                  <a class="dropdown-item" href="{{ route('admin.profile') }}">
-                                      <i class="bi bi-person me-2"></i>Profile Saya
-                                  </a>
-                              @else
-                                  <a class="dropdown-item" href="{{ route('murid.profile') }}">
-                                      <i class="bi bi-person me-2"></i>Profile Saya
-                                  </a>
-                              @endif
-                          </li>
-                          <li><hr class="dropdown-divider"></li>
-                          <li>
-                              <a class="dropdown-item text-danger" href="{{ route('logout') }}" 
-                                onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                  <i class="bi bi-box-arrow-right me-2"></i>Logout
-                              </a>
-                              <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                                  @csrf
-                              </form>
-                          </li>
-                      </ul>
-                  </li>
-              </ul>
+                  </div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.murid.*') ? 'active' : '' }}" href="{{ route('admin.murid.index') }}">
+                          <i class="bi bi-people"></i>
+                          <span>Murid</span>
+                      </a>
+                  </div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.tagihan.*') ? 'active' : '' }}" href="{{ route('admin.tagihan.index') }}">
+                          <i class="bi bi-receipt"></i>
+                          <span>Tagihan</span>
+                      </a>
+                  </div>
+                  
+                  <!-- Menu Pembayaran (Verifikasi) -->
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.pembayaran.index') || request()->routeIs('admin.pembayaran.history') || request()->routeIs('admin.pembayaran.show') ? 'active' : '' }}" href="{{ route('admin.pembayaran.index') }}">
+                          <i class="bi bi-credit-card"></i>
+                          <span>Pembayaran</span>
+                          @php
+                              $pendingCount = $pembayaranPendingCount ?? \App\Models\Pembayaran::where('status', 'pending')->count();
+                          @endphp
+                          @if($pendingCount > 0)
+                          <span class="nav-badge">{{ $pendingCount }}</span>
+                          @endif
+                      </a>
+                  </div>
+                  
+                  <!-- Menu Pembayaran Manual -->
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.pembayaran.manual.*') ? 'active' : '' }}" href="{{ route('admin.pembayaran.manual.create') }}">
+                          <i class="bi bi-cash-coin"></i>
+                          <span>Pembayaran Manual</span>
+                      </a>
+                  </div>
+                  
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.pengeluaran.*') ? 'active' : '' }}" href="{{ route('admin.pengeluaran.index') }}">
+                          <i class="bi bi-cash-coin"></i>
+                          <span>Pengeluaran</span>
+                      </a>
+                  </div>
+              </div>
+              
+              <div class="nav-section">
+                  <div class="nav-section-title">Lainnya</div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.profile') ? 'active' : '' }}" href="{{ route('admin.profile') }}">
+                          <i class="bi bi-person"></i>
+                          <span>Profile Saya</span>
+                      </a>
+                  </div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('admin.spp-setting') ? 'active' : '' }}" href="{{ route('admin.spp-setting') }}">
+                          <i class="bi bi-gear"></i>
+                          <span>Pengaturan</span>
+                      </a>
+                  </div>
+              </div>
+              @else
+              <div class="nav-section">
+                    <div class="nav-section-title">Menu Murid</div>
+                    <div class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
+                            <i class="bi bi-speedometer2"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
+                            <i class="bi bi-receipt"></i>
+                            <span>Tagihan Saya</span>
+                        </a>
+                    </div>
+                    <div class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
+                            <i class="bi bi-clock-history"></i>
+                            <span>Riwayat</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="nav-section">
+                    <div class="nav-section-title">Lainnya</div>
+                    <div class="nav-item">
+                        <a class="nav-link {{ request()->routeIs('murid.profile') ? 'active' : '' }}" href="{{ route('murid.profile') }}">
+                            <i class="bi bi-person"></i>
+                            <span>Profile Saya</span>
+                        </a>
+                    </div>
+                </div>
+              @endif
+          </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    @if(auth()->user()->foto)
+                        <img src="{{ asset('storage/' . auth()->user()->foto) }}" 
+                            alt="Foto Profil"
+                            class="user-avatar">
+                    @else
+                        <div class="user-avatar d-flex align-items-center justify-content-center" 
+                            style="background-color: rgba(255, 255, 255, 0.2);">
+                            <i class="bi bi-person text-white"></i>
+                        </div>
+                    @endif
+                    <div class="user-info">
+                        <div class="user-name">{{ auth()->user()->nama }}</div>
+                        <div class="user-role">{{ auth()->user()->isAdmin() ? 'Administrator' : 'Murid' }}</div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="user-dropdown" type="button" id="userDropdown" data-bs-toggle="dropdown">
+                            <i class="bi bi-three-dots-vertical"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item text-danger" href="{{ route('logout') }}" 
+                                  onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                    <i class="bi bi-box-arrow-right me-2"></i>Logout
+                                </a>
+                                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+                                    @csrf
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
             @endauth
-        </div>
-    </nav>
+        </aside>
 
-    <!-- Main Content -->
-    <main class="py-4">
-        <div class="container-fluid">
-            @if(session('success'))
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            @auth
+            {{-- <div class="top-navbar">
+                <button class="mobile-toggle" id="mobileToggle">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div class="top-nav-actions">
+                    <!-- Notifications, messages, etc. can go here -->
+                    <div class="dropdown">
+                        <button class="btn btn-outline-primary btn-sm" type="button" id="notificationsDropdown" data-bs-toggle="dropdown">
+                            <i class="bi bi-bell"></i>
+                            <span class="badge bg-danger">3</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Notifikasi</h6></li>
+                            <li><a class="dropdown-item" href="#">Pembayaran baru dari Andi</a></li>
+                            <li><a class="dropdown-item" href="#">Tagihan bulanan telah dibuat</a></li>
+                            <li><a class="dropdown-item" href="#">Pengingat: Laporan bulanan</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-center" href="#">Lihat semua</a></li>
+                        </ul>
+                    </div>
                 </div>
-            @endif
-            
-            @if(session('error'))
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <i class="bi bi-exclamation-circle me-2"></i>{{ session('error') }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            @endif
+            </div> --}}
+            @endauth
 
-            @yield('content')
-        </div>
-    </main>
+            <div class="content-wrapper">
+                @if(session('success'))
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>{{ session('success') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                @endif
+                
+                @if(session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-circle me-2"></i>{{ session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                @endif
+
+                @yield('content')
+            </div>
+        </main>
+    </div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- Custom JS -->
     <script>
-        // Material Design Ripple Effect
         document.addEventListener('DOMContentLoaded', function() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const mobileToggle = document.getElementById('mobileToggle');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            
+            // Function to toggle sidebar
+            function toggleSidebar() {
+                sidebar.classList.toggle('expanded');
+                mainContent.classList.toggle('sidebar-expanded');
+                
+                // For mobile, also toggle overlay
+                if (window.innerWidth <= 768) {
+                    sidebarOverlay.classList.toggle('active');
+                }
+            }
+            
+            // Desktop toggle
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', toggleSidebar);
+            }
+            
+            // Mobile toggle
+            if (mobileToggle) {
+                mobileToggle.addEventListener('click', toggleSidebar);
+            }
+            
+            // Close sidebar when clicking on overlay (mobile)
+            if (sidebarOverlay) {
+                sidebarOverlay.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('expanded');
+                        mainContent.classList.remove('sidebar-expanded');
+                        sidebarOverlay.classList.remove('active');
+                    }
+                });
+            }
+            
+            // Close sidebar when clicking on a nav link (mobile)
+            const navLinks = document.querySelectorAll('.nav-link');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('expanded');
+                        mainContent.classList.remove('sidebar-expanded');
+                        sidebarOverlay.classList.remove('active');
+                    }
+                });
+            });
+            
+            // Material Design Ripple Effect
             const buttons = document.querySelectorAll('.btn');
             buttons.forEach(button => {
                 button.addEventListener('click', function(e) {

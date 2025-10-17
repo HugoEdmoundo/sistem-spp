@@ -9,7 +9,7 @@ class Pembayaran extends Model
     use HasFactory;
 
     protected $fillable = [
-        'tagihan_id', // Bisa null
+        'tagihan_id',
         'user_id',
         'metode',
         'bukti',
@@ -29,7 +29,12 @@ class Pembayaran extends Model
         'jumlah' => 'decimal:2'
     ];
 
-    // Relasi - tagihan bisa null
+    // Nilai default untuk atribut
+    protected $attributes = [
+        'status' => 'pending'
+    ];
+
+    // Relasi
     public function tagihan()
     {
         return $this->belongsTo(Tagihan::class);
@@ -45,15 +50,60 @@ class Pembayaran extends Model
         return $this->belongsTo(User::class, 'admin_id');
     }
 
-    // Scope untuk pembayaran yang diterima
+    // Scopes
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
     public function scopeDiterima($query)
     {
         return $query->where('status', 'accepted');
     }
 
-    // Scope untuk pembayaran tanpa tagihan (fleksibel)
+    public function scopeDitolak($query)
+    {
+        return $query->where('status', 'rejected');
+    }
+
     public function scopeTanpaTagihan($query)
     {
         return $query->whereNull('tagihan_id');
+    }
+
+    public function scopeDenganTagihan($query)
+    {
+        return $query->whereNotNull('tagihan_id');
+    }
+
+    // Accessors
+    public function getStatusLabelAttribute()
+    {
+        return [
+            'pending' => 'Menunggu',
+            'accepted' => 'Diterima',
+            'rejected' => 'Ditolak'
+        ][$this->status] ?? $this->status;
+    }
+
+    public function getJumlahFormattedAttribute()
+    {
+        return 'Rp ' . number_format($this->jumlah, 0, ',', '.');
+    }
+
+    // Methods
+    public function isPending()
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isAccepted()
+    {
+        return $this->status === 'accepted';
+    }
+
+    public function isRejected()
+    {
+        return $this->status === 'rejected';
     }
 }

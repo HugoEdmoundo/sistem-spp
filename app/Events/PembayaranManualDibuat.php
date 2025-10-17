@@ -10,7 +10,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class StatusPembayaranDiupdate implements ShouldBroadcast
+class PembayaranManualDibuat implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -28,21 +28,9 @@ class StatusPembayaranDiupdate implements ShouldBroadcast
 
     public function broadcastWith()
     {
-        $status = $this->pembayaran->status == 'accepted' ? 'diterima' : 'ditolak';
-        
-        // Handle jika tagihan null (pembayaran manual)
-        if ($this->pembayaran->tagihan) {
-            $keterangan = $this->pembayaran->tagihan->keterangan;
-            $message = "Pembayaran Anda untuk {$keterangan} telah {$status}";
-        } else {
-            // Untuk pembayaran manual tanpa tagihan
-            $keterangan = $this->pembayaran->keterangan;
-            $message = "Pembayaran manual untuk {$keterangan} telah {$status}";
-        }
-
         return [
             'id' => $this->pembayaran->id,
-            'message' => $message,
+            'message' => "Admin telah membuat pembayaran manual untuk {$this->pembayaran->keterangan} sebesar Rp " . number_format($this->pembayaran->jumlah, 0, ',', '.'),
             'status' => $this->pembayaran->status,
             'time' => now()->diffForHumans(),
             'url' => route('murid.pembayaran.history')
@@ -51,6 +39,6 @@ class StatusPembayaranDiupdate implements ShouldBroadcast
 
     public function broadcastAs()
     {
-        return 'status.pembayaran.diupdate';
+        return 'pembayaran.manual.dibuat';
     }
 }

@@ -1,7 +1,7 @@
-<!-- resources/views/admin/tagihan/create.blade.php -->
+<!-- resources/views/admin/tagihan/edit.blade.php -->
 @extends('layouts.app')
 
-@section('title', 'Tambah Tagihan')
+@section('title', 'Edit Tagihan')
 
 @section('content')
 <div class="container-fluid">
@@ -10,12 +10,12 @@
         <div class="col">
             <div class="d-flex justify-content-between align-items-center">
                 <div>
-                    <h1 class="h3 mb-2 text-gray-800">Tambah Tagihan Baru</h1>
+                    <h1 class="h3 mb-2 text-gray-800">Edit Tagihan</h1>
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb mb-0">
                             <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
                             <li class="breadcrumb-item"><a href="{{ route('admin.tagihan.index') }}">Tagihan</a></li>
-                            <li class="breadcrumb-item active">Tambah Tagihan</li>
+                            <li class="breadcrumb-item active">Edit Tagihan</li>
                         </ol>
                     </nav>
                 </div>
@@ -30,30 +30,26 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card material-card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="bi bi-plus-circle me-2"></i>Form Tambah Tagihan Custom
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="card-title mb-0">
+                        <i class="bi bi-pencil-square me-2"></i>Edit Tagihan
                     </h5>
                 </div>
                 <div class="card-body p-4">
-                    <form method="POST" action="{{ route('admin.tagihan.store') }}" id="tagihanForm">
+                    <form method="POST" action="{{ route('admin.tagihan.update', $tagihan->id) }}" id="tagihanForm">
                         @csrf
+                        @method('PUT')
                         
-                        <!-- Student Selection -->
+                        <!-- Student Info (Readonly) -->
                         <div class="row mb-4">
                             <div class="col-md-12">
-                                <label class="form-label fw-semibold">Pilih Murid <span class="text-danger">*</span></label>
-                                <select name="user_id" class="form-select form-control-lg material-form" required id="userSelect">
-                                    <option value="">-- Pilih Murid --</option>
-                                    @foreach($murid as $item)
-                                    <option value="{{ $item->id }}" {{ old('user_id') == $item->id ? 'selected' : '' }}>
-                                        {{ $item->nama }} - {{ $item->email }} ({{ $item->kelas ?? 'Tidak ada kelas' }})
-                                    </option>
-                                    @endforeach
-                                </select>
-                                @error('user_id')
-                                    <div class="text-danger mt-1">{{ $message }}</div>
-                                @enderror
+                                <label class="form-label fw-semibold">Murid</label>
+                                <div class="form-control bg-light">
+                                    <strong>{{ $tagihan->user->nama }}</strong> - {{ $tagihan->user->email }} ({{ $tagihan->user->kelas ?? 'Tidak ada kelas' }})
+                                </div>
+                                <div class="form-text text-muted">
+                                    Murid tidak dapat diubah karena tagihan sudah terkait dengan data pembayaran.
+                                </div>
                             </div>
                         </div>
 
@@ -62,11 +58,9 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Jenis Tagihan <span class="text-danger">*</span></label>
                                 <select name="jenis" class="form-select material-form" required>
-                                    <option value="custom" selected>Custom Tagihan</option>
+                                    <option value="spp" {{ $tagihan->jenis == 'spp' ? 'selected' : '' }}>SPP</option>
+                                    <option value="custom" {{ $tagihan->jenis == 'custom' ? 'selected' : '' }}>Custom Tagihan</option>
                                 </select>
-                                <div class="form-text text-muted">
-                                    Untuk tagihan SPP bulanan, gunakan fitur generate otomatis
-                                </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">Jumlah Tagihan <span class="text-danger">*</span></label>
@@ -77,7 +71,7 @@
                                            class="form-control material-form" 
                                            min="0" 
                                            required 
-                                           value="{{ old('jumlah') }}"
+                                           value="{{ old('jumlah', $tagihan->jumlah) }}"
                                            placeholder="0">
                                 </div>
                                 @error('jumlah')
@@ -95,7 +89,7 @@
                                        class="form-control material-form" 
                                        placeholder="Contoh: Denda keterlambatan, Seragam sekolah, Kegiatan study tour, dll" 
                                        required
-                                       value="{{ old('keterangan') }}">
+                                       value="{{ old('keterangan', $tagihan->keterangan) }}">
                                 @error('keterangan')
                                     <div class="text-danger mt-1">{{ $message }}</div>
                                 @enderror
@@ -104,13 +98,6 @@
 
                         <!-- Period Selection -->
                         <div class="row mb-4">
-                            <div class="col-md-12">
-                                <label class="form-label fw-semibold">Periode Tagihan (Opsional)</label>
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle me-2"></i>
-                                    <small>Isi periode jika tagihan terkait dengan bulan/tahun tertentu. Kosongkan jika tagihan bersifat umum.</small>
-                                </div>
-                            </div>
                             <div class="col-md-6">
                                 <label class="form-label">Bulan</label>
                                 <select name="bulan" class="form-select material-form">
@@ -123,7 +110,7 @@
                                         ];
                                     @endphp
                                     @foreach($months as $key => $month)
-                                    <option value="{{ $key }}" {{ old('bulan') == $key ? 'selected' : '' }}>
+                                    <option value="{{ $key }}" {{ old('bulan', $tagihan->bulan) == $key ? 'selected' : '' }}>
                                         {{ $month }}
                                     </option>
                                     @endforeach
@@ -134,7 +121,7 @@
                                 <select name="tahun" class="form-select material-form">
                                     <option value="">-- Pilih Tahun --</option>
                                     @for($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                    <option value="{{ $i }}" {{ old('tahun') == $i ? 'selected' : '' }}>
+                                    <option value="{{ $i }}" {{ old('tahun', $tagihan->tahun) == $i ? 'selected' : '' }}>
                                         {{ $i }}
                                     </option>
                                     @endfor
@@ -142,32 +129,53 @@
                             </div>
                         </div>
 
+                        <!-- Status Info -->
+                        @if($tagihan->pembayaran)
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>Informasi:</strong> Tagihan ini sudah memiliki pembayaran dengan status 
+                                    <span class="badge bg-{{ $tagihan->pembayaran->status == 'success' ? 'success' : ($tagihan->pembayaran->status == 'pending' ? 'warning' : 'danger') }}">
+                                        {{ $tagihan->pembayaran->status }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
+
                         <!-- Preview Section -->
                         <div class="row mb-4">
                             <div class="col-md-12">
-                                <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark">
+                                <div class="card border-primary">
+                                    <div class="card-header bg-primary text-white">
                                         <h6 class="mb-0">
-                                            <i class="bi bi-eye me-2"></i>Pratinjau Tagihan
+                                            <i class="bi bi-eye me-2"></i>Pratinjau Perubahan
                                         </h6>
                                     </div>
                                     <div class="card-body">
                                         <div class="row">
                                             <div class="col-md-6">
                                                 <small class="text-muted">Murid:</small>
-                                                <div id="previewNama" class="fw-semibold">-</div>
+                                                <div class="fw-semibold">{{ $tagihan->user->nama }}</div>
                                             </div>
                                             <div class="col-md-6">
                                                 <small class="text-muted">Keterangan:</small>
-                                                <div id="previewKeterangan" class="fw-semibold">-</div>
+                                                <div id="previewKeterangan" class="fw-semibold">{{ $tagihan->keterangan }}</div>
                                             </div>
                                             <div class="col-md-6 mt-2">
                                                 <small class="text-muted">Periode:</small>
-                                                <div id="previewPeriode" class="fw-semibold">-</div>
+                                                <div id="previewPeriode" class="fw-semibold">
+                                                    @if($tagihan->bulan && $tagihan->tahun)
+                                                        {{ DateTime::createFromFormat('!m', $tagihan->bulan)->format('F') }} {{ $tagihan->tahun }}
+                                                    @else
+                                                        -
+                                                    @endif
+                                                </div>
                                             </div>
                                             <div class="col-md-6 mt-2">
                                                 <small class="text-muted">Jumlah:</small>
-                                                <div id="previewJumlah" class="fw-bold text-success">Rp 0</div>
+                                                <div id="previewJumlah" class="fw-bold text-success">Rp {{ number_format($tagihan->jumlah, 0, ',', '.') }}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -182,8 +190,8 @@
                                     <a href="{{ route('admin.tagihan.index') }}" class="btn btn-outline-secondary">
                                         <i class="bi bi-x-circle me-2"></i>Batal
                                     </a>
-                                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                                        <i class="bi bi-check-circle me-2"></i>Simpan Tagihan
+                                    <button type="submit" class="btn btn-warning" id="submitBtn">
+                                        <i class="bi bi-check-circle me-2"></i>Update Tagihan
                                     </button>
                                 </div>
                             </div>
@@ -195,65 +203,19 @@
     </div>
 </div>
 
-<style>
-    .form-label {
-        color: var(--dark);
-        margin-bottom: 0.5rem;
-    }
-    
-    .material-form .form-control,
-    .material-form .form-select {
-        border: 2px solid #e2e8f0;
-        border-radius: var(--border-radius);
-        padding: 0.75rem 1rem;
-        transition: var(--transition);
-    }
-    
-    .material-form .form-control:focus,
-    .material-form .form-select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(30, 132, 73, 0.1);
-    }
-    
-    .form-control-lg {
-        padding: 1rem 1.25rem;
-        font-size: 1.1rem;
-    }
-    
-    .input-group-text {
-        background-color: #f8f9fa;
-        border: 2px solid #e2e8f0;
-        border-right: none;
-    }
-    
-    .material-form .form-control:focus + .input-group-text {
-        border-color: var(--primary);
-    }
-    
-    .card-header.bg-primary {
-        background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
-    }
-</style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const userSelect = document.getElementById('userSelect');
         const keteranganInput = document.querySelector('input[name="keterangan"]');
         const jumlahInput = document.querySelector('input[name="jumlah"]');
         const bulanSelect = document.querySelector('select[name="bulan"]');
         const tahunSelect = document.querySelector('select[name="tahun"]');
         
-        const previewNama = document.getElementById('previewNama');
         const previewKeterangan = document.getElementById('previewKeterangan');
         const previewPeriode = document.getElementById('previewPeriode');
         const previewJumlah = document.getElementById('previewJumlah');
         
         // Update preview function
         function updatePreview() {
-            // Update student name
-            const selectedOption = userSelect.options[userSelect.selectedIndex];
-            previewNama.textContent = selectedOption.value ? selectedOption.text.split(' - ')[0] : '-';
-            
             // Update description
             previewKeterangan.textContent = keteranganInput.value || '-';
             
@@ -276,7 +238,6 @@
         }
         
         // Add event listeners
-        userSelect.addEventListener('change', updatePreview);
         keteranganInput.addEventListener('input', updatePreview);
         jumlahInput.addEventListener('input', updatePreview);
         bulanSelect.addEventListener('change', updatePreview);
@@ -306,12 +267,11 @@
                     }
                 });
                 
-                // Show error message
                 alert('Harap lengkapi semua field yang wajib diisi!');
             } else {
                 // Show loading state
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Menyimpan...';
+                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Memperbarui...';
             }
         });
         
@@ -324,9 +284,6 @@
                 }
             });
         });
-        
-        // Initialize preview
-        updatePreview();
     });
 </script>
 @endsection
