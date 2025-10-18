@@ -8,7 +8,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4><i class="bi bi-clock-history me-2"></i>Riwayat Pembayaran</h4>
         <div>
-            <a href="{{ route('admin.pembayaran.index') }}" class="btn btn-outline-warning">
+            <a href="{{ route('admin.pembayaran.index') }}" class="btn btn-warning">
                 <i class="bi bi-clock me-2"></i>Menunggu Verifikasi
                 @if($pembayaranPending > 0)
                 <span class="badge bg-danger ms-1">{{ $pembayaranPending }}</span>
@@ -52,7 +52,7 @@
                             <th>Bukti</th>
                             <th>Admin</th>
                             <th>Tanggal Proses</th>
-                            <th>Aksi</th>
+                            {{-- <th>Aksi</th> --}}
                         </tr>
                     </thead>
                     <tbody>
@@ -120,11 +120,11 @@
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
-                            <td>
+                            {{-- <td>
                                 <a href="{{ route('admin.pembayaran.show', $item->id) }}" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Detail Pembayaran">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                            </td>
+                            </td> --}}
                         </tr>
                         @empty
                         <tr>

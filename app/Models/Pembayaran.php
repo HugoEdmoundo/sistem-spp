@@ -18,7 +18,8 @@ class Pembayaran extends Model
         'keterangan',
         'jenis_bayar',
         'tanggal_proses',
-        'admin_id'
+        'admin_id',
+        'tanggal_upload'
     ];
 
     protected $casts = [
@@ -29,12 +30,10 @@ class Pembayaran extends Model
         'jumlah' => 'decimal:2'
     ];
 
-    // Nilai default untuk atribut
     protected $attributes = [
         'status' => 'pending'
     ];
 
-    // Relasi
     public function tagihan()
     {
         return $this->belongsTo(Tagihan::class);
@@ -50,7 +49,6 @@ class Pembayaran extends Model
         return $this->belongsTo(User::class, 'admin_id');
     }
 
-    // Scopes
     public function scopePending($query)
     {
         return $query->where('status', 'pending');
@@ -76,7 +74,6 @@ class Pembayaran extends Model
         return $query->whereNotNull('tagihan_id');
     }
 
-    // Accessors
     public function getStatusLabelAttribute()
     {
         return [
@@ -91,7 +88,6 @@ class Pembayaran extends Model
         return 'Rp ' . number_format($this->jumlah, 0, ',', '.');
     }
 
-    // Methods
     public function isPending()
     {
         return $this->status === 'pending';

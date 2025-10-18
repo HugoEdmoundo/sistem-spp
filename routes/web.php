@@ -36,12 +36,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::post('/murid/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admin.murid.reset-password');
     
     // Tagihan Management
-    Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('tagihan.index');
-    Route::get('/tagihan/create', [AdminController::class, 'tagihanCreate'])->name('tagihan.create');
-    Route::post('/tagihan', [AdminController::class, 'tagihanStore'])->name('tagihan.store');
-    Route::get('/tagihan/{tagihan}/edit', [AdminController::class, 'tagihanEdit'])->name('tagihan.edit');
-    Route::put('/tagihan/{tagihan}', [AdminController::class, 'tagihanUpdate'])->name('tagihan.update');
-    Route::delete('/tagihan/{tagihan}', [AdminController::class, 'tagihanDestroy'])->name('tagihan.destroy');
+    // routes/web.php - Hanya yang diperlukan saja
+    Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('admin.tagihan.index');
+    Route::get('/tagihan/create', [AdminController::class, 'tagihanCreate'])->name('admin.tagihan.create');
+    Route::post('/tagihan', [AdminController::class, 'tagihanStore'])->name('admin.tagihan.store');
+    Route::delete('/tagihan/{tagihan}', [AdminController::class, 'tagihanDestroy'])->name('admin.tagihan.destroy');
     
     // Pembayaran Management
     Route::get('/pembayaran', [AdminController::class, 'pembayaranIndex'])->name('admin.pembayaran.index');
@@ -76,21 +75,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
 });
 
 // Murid Routes
+
+// Routes Murid
 Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/dashboard', [MuridController::class, 'dashboard'])->name('murid.dashboard');
     Route::get('/tagihan', [MuridController::class, 'tagihanIndex'])->name('murid.tagihan.index');
+    Route::get('/bayar-spp', [MuridController::class, 'showBayarSpp'])->name('murid.bayar.spp.page');
+    Route::post('/bayar-spp', [MuridController::class, 'bayarSpp'])->name('murid.bayar.spp');
     Route::post('/upload-bukti/{id}', [MuridController::class, 'uploadBukti'])->name('murid.upload.bukti');
     Route::get('/pembayaran/history', [MuridController::class, 'pembayaranHistory'])->name('murid.pembayaran.history');
     Route::get('/profile', [MuridController::class, 'profile'])->name('murid.profile');
     Route::post('/profile', [MuridController::class, 'updateProfile'])->name('murid.profile.update');
-
-    // Murid Routes - tambah bayar SPP fleksibel
-    Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
-        // ... routes lainnya ...
-        Route::post('/bayar-spp', [MuridController::class, 'bayarSpp'])->name('murid.bayar.spp');
-    });
+    
 });
-
 
 // Laporan & Export
 Route::post('/admin/export/tagihan', [AdminController::class, 'exportTagihan'])->name('admin.export.tagihan');

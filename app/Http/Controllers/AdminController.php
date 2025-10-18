@@ -127,91 +127,40 @@ class AdminController extends Controller
     }
 
     // ==================== TAGIHAN MANAGEMENT ====================
-    // ==================== TAGIHAN MANAGEMENT ====================
     public function tagihanIndex()
     {
         $tagihan = Tagihan::with('user')->latest()->get();
-        
-        // Hitung statistik
-        $totalTagihan = Tagihan::count();
-        $tagihanSuccess = Tagihan::where('status', 'success')->count();
-        $tagihanPending = Tagihan::where('status', 'pending')->count();
-        $tagihanUnpaid = Tagihan::where('status', 'unpaid')->count();
-
-        return view('admin.tagihan.index', compact(
-            'tagihan', 
-            'totalTagihan',
-            'tagihanSuccess', 
-            'tagihanPending', 
-            'tagihanUnpaid'
-        ));
+        return view('admin.tagihan.index', compact('tagihan'));
     }
-
+    
     public function tagihanCreate()
     {
         $murid = User::where('role', 'murid')->where('aktif', true)->get();
         return view('admin.tagihan.create', compact('murid'));
     }
-
+    
     public function tagihanStore(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|array',
-            'user_id.*' => 'exists:users,id',
-            'jenis' => 'required|in:spp,custom',
-            'keterangan' => 'required|string|max:255',
-            'jumlah' => 'required|numeric|min:0',
-            'bulan' => 'nullable|integer|between:1,12',
-            'tahun' => 'nullable|integer'
+            'user_id' => 'required',
+            'jenis' => 'required',
+            'keterangan' => 'required',
+            'jumlah' => 'required|numeric|min:0'
         ]);
 
-        $createdCount = 0;
-        foreach ($request->user_id as $userId) {
-            Tagihan::create([
-                'user_id' => $userId,
-                'jenis' => $request->jenis,
-                'keterangan' => $request->keterangan,
-                'jumlah' => $request->jumlah,
-                'bulan' => $request->bulan,
-                'tahun' => $request->tahun,
-                'status' => 'unpaid'
-            ]);
-            $createdCount++;
-        }
-
-        $message = $createdCount > 1 
-            ? "Tagihan berhasil dibuat untuk {$createdCount} murid." 
-            : "Tagihan berhasil ditambahkan.";
-
-        return redirect()->route('admin.tagihan.index')->with('success', $message);
-    }
-
-    public function tagihanEdit(Tagihan $tagihan)
-    {
-        return view('admin.tagihan.edit', compact('tagihan'));
-    }
-
-    public function tagihanUpdate(Request $request, Tagihan $tagihan)
-    {
-        $request->validate([
-            'jenis' => 'required|in:spp,custom',
-            'keterangan' => 'required|string|max:255',
-            'jumlah' => 'required|numeric|min:0',
-            'bulan' => 'nullable|integer|between:1,12',
-            'tahun' => 'nullable|integer'
-        ]);
-
-        $tagihan->update([
+        Tagihan::create([
+            'user_id' => $request->user_id,
             'jenis' => $request->jenis,
             'keterangan' => $request->keterangan,
-            'jumlah' => $request->jumlah,
             'bulan' => $request->bulan,
-            'tahun' => $request->tahun
+            'tahun' => $request->tahun,
+            'jumlah' => $request->jumlah,
+            'status' => 'unpaid'
         ]);
 
-        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil diperbarui.');
+        return redirect()->route('admin.tagihan.index')->with('success', 'Tagihan berhasil ditambahkan.');
     }
-
+    
     public function tagihanDestroy(Tagihan $tagihan)
     {
         if ($tagihan->pembayaran) {
@@ -370,13 +319,18 @@ class AdminController extends Controller
 
     public function rejectPembayaran($id)
     {
-        $pembayaran = Pembayaran::findOrFail($id);
+        $pembayaran = Pembayaran::with('tagihan')->findOrFail($id); // TAMBAH with('tagihan')
         
         $pembayaran->update([
             'status' => 'rejected',
-            'tanggal_proses' => now(),
+               'tanggal_proses' => now(),
             'admin_id' => auth()->id()
         ]);
+
+        // TAMBAH: Jika ada tagihan terkait, update status tagihan ke 'unpaid'
+        if ($pembayaran->tagihan) {
+            $pembayaran->tagihan->update(['status' => 'unpaid']);
+        }
 
         // Buat notifikasi untuk murid
         Notification::create([

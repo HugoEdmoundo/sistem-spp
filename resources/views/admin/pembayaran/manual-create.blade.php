@@ -7,9 +7,6 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4><i class="bi bi-cash-coin me-2"></i>Buat Pembayaran Manual</h4>
-            <a href="{{ route('admin.pembayaran.history') }}" class="btn btn-secondary">
-                <i class="bi bi-arrow-left me-2"></i>Kembali
-            </a>
         </div>
     </div>
 </div>

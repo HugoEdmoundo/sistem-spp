@@ -4,329 +4,59 @@
 @section('title', 'Tambah Tagihan')
 
 @section('content')
-<div class="container-fluid">
-    <!-- Header Section -->
-    <div class="row mb-4">
-        <div class="col">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h1 class="h3 mb-2 text-gray-800">Tambah Tagihan Baru</h1>
-                    <nav aria-label="breadcrumb">
-                        <ol class="breadcrumb mb-0">
-                            <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">Dashboard</a></li>
-                            <li class="breadcrumb-item"><a href="{{ route('admin.tagihan.index') }}">Tagihan</a></li>
-                            <li class="breadcrumb-item active">Tambah Tagihan</li>
-                        </ol>
-                    </nav>
-                </div>
-                <a href="{{ route('admin.tagihan.index') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left me-2"></i>Kembali
-                </a>
-            </div>
-        </div>
+<div class="card">
+    <div class="card-header">
+        <h5>Tambah Tagihan Custom</h5>
     </div>
-
-    <!-- Main Card -->
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card material-card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0 text-white">
-                        <i class="bi bi-plus-circle me-2"></i>Form Tambah Tagihan Custom
-                    </h5>
+    <div class="card-body">
+        <form method="POST" action="{{ route('admin.tagihan.store') }}">
+            @csrf
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label>Murid</label>
+                    <select name="user_id" class="form-control" required>
+                        <option value="">Pilih Murid</option>
+                        @foreach($murid as $item)
+                        <option value="{{ $item->id }}">{{ $item->nama }} ({{ $item->email }})</option>
+                        @endforeach
+                    </select>
                 </div>
-                <div class="card-body p-4">
-                    <form method="POST" action="{{ route('admin.tagihan.store') }}" id="tagihanForm">
-                        @csrf
-                        
-                        <!-- Student Selection -->
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <label class="form-label fw-semibold">Pilih Murid <span class="text-danger">*</span></label>
-                                <select name="user_id" class="form-select form-control-lg material-form" required id="userSelect">
-                                    <option value="">-- Pilih Murid --</option>
-                                    @foreach($murid as $item)
-                                    <option value="{{ $item->id }}" {{ old('user_id') == $item->id ? 'selected' : '' }}>
-                                        {{ $item->nama }} - {{ $item->email }} ({{ $item->kelas ?? 'Tidak ada kelas' }})
-                                    </option>
-                                    @endforeach
-                                </select>
-                                @error('user_id')
-                                    <div class="text-danger mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <!-- Tagihan Type & Amount -->
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Jenis Tagihan <span class="text-danger">*</span></label>
-                                <select name="jenis" class="form-select material-form" required>
-                                    <option value="custom" selected>Custom Tagihan</option>
-                                </select>
-                                <div class="form-text text-muted">
-                                    Untuk tagihan SPP bulanan, gunakan fitur generate otomatis
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Jumlah Tagihan <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light">Rp</span>
-                                    <input type="number" 
-                                           name="jumlah" 
-                                           class="form-control material-form" 
-                                           min="0" 
-                                           required 
-                                           value="{{ old('jumlah') }}"
-                                           placeholder="0">
-                                </div>
-                                @error('jumlah')
-                                    <div class="text-danger mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <!-- Description -->
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <label class="form-label fw-semibold">Keterangan Tagihan <span class="text-danger">*</span></label>
-                                <input type="text" 
-                                       name="keterangan" 
-                                       class="form-control material-form" 
-                                       placeholder="Contoh: Denda keterlambatan, Seragam sekolah, Kegiatan study tour, dll" 
-                                       required
-                                       value="{{ old('keterangan') }}">
-                                @error('keterangan')
-                                    <div class="text-danger mt-1">{{ $message }}</div>
-                                @enderror
-                            </div>
-                        </div>
-
-                        <!-- Period Selection -->
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <label class="form-label fw-semibold">Periode Tagihan (Opsional)</label>
-                                <div class="alert alert-info">
-                                    <i class="bi bi-info-circle me-2"></i>
-                                    <small>Isi periode jika tagihan terkait dengan bulan/tahun tertentu. Kosongkan jika tagihan bersifat umum.</small>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Bulan</label>
-                                <select name="bulan" class="form-select material-form">
-                                    <option value="">-- Pilih Bulan --</option>
-                                    @php
-                                        $months = [
-                                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                                        ];
-                                    @endphp
-                                    @foreach($months as $key => $month)
-                                    <option value="{{ $key }}" {{ old('bulan') == $key ? 'selected' : '' }}>
-                                        {{ $month }}
-                                    </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Tahun</label>
-                                <select name="tahun" class="form-select material-form">
-                                    <option value="">-- Pilih Tahun --</option>
-                                    @for($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                    <option value="{{ $i }}" {{ old('tahun') == $i ? 'selected' : '' }}>
-                                        {{ $i }}
-                                    </option>
-                                    @endfor
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Preview Section -->
-                        <div class="row mb-4">
-                            <div class="col-md-12">
-                                <div class="card border-warning">
-                                    <div class="card-header bg-warning text-dark">
-                                        <h6 class="mb-0">
-                                            <i class="bi bi-eye me-2"></i>Pratinjau Tagihan
-                                        </h6>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <small class="text-muted">Murid:</small>
-                                                <div id="previewNama" class="fw-semibold">-</div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <small class="text-muted">Keterangan:</small>
-                                                <div id="previewKeterangan" class="fw-semibold">-</div>
-                                            </div>
-                                            <div class="col-md-6 mt-2">
-                                                <small class="text-muted">Periode:</small>
-                                                <div id="previewPeriode" class="fw-semibold">-</div>
-                                            </div>
-                                            <div class="col-md-6 mt-2">
-                                                <small class="text-muted">Jumlah:</small>
-                                                <div id="previewJumlah" class="fw-bold text-success">Rp 0</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Action Buttons -->
-                        <div class="row mt-4">
-                            <div class="col-md-12">
-                                <div class="d-flex gap-2 justify-content-end">
-                                    <a href="{{ route('admin.tagihan.index') }}" class="btn btn-outline-secondary">
-                                        <i class="bi bi-x-circle me-2"></i>Batal
-                                    </a>
-                                    <button type="submit" class="btn btn-primary" id="submitBtn">
-                                        <i class="bi bi-check-circle me-2"></i>Simpan Tagihan
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
+                <div class="col-md-6 mb-3">
+                    <label>Jenis Tagihan</label>
+                    <select name="jenis" class="form-control" required>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="col-md-12 mb-3">
+                    <label>Keterangan</label>
+                    <input type="text" name="keterangan" class="form-control" placeholder="Contoh: Denda, Seragam, Kegiatan, dll" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Bulan (Opsional untuk SPP)</label>
+                    <select name="bulan" class="form-control">
+                        <option value="">Pilih Bulan</option>
+                        @for($i = 1; $i <= 12; $i++)
+                        <option value="{{ $i }}">{{ DateTime::createFromFormat('!m', $i)->format('F') }}</option>
+                        @endfor
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Tahun (Opsional untuk SPP)</label>
+                    <select name="tahun" class="form-control">
+                        <option value="">Pilih Tahun</option>
+                        @for($i = date('Y'); $i >= date('Y') - 5; $i--)
+                        <option value="{{ $i }}">{{ $i }}</option>
+                        @endfor
+                    </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label>Jumlah</label>
+                    <input type="number" name="jumlah" class="form-control" min="0" required>
                 </div>
             </div>
-        </div>
+            <button type="submit" class="btn btn-primary">Simpan</button>
+            <a href="{{ route('admin.tagihan.index') }}" class="btn btn-secondary">Batal</a>
+        </form>
     </div>
 </div>
-
-<style>
-    .form-label {
-        color: var(--dark);
-        margin-bottom: 0.5rem;
-    }
-    
-    .material-form .form-control,
-    .material-form .form-select {
-        border: 2px solid #e2e8f0;
-        border-radius: var(--border-radius);
-        padding: 0.75rem 1rem;
-        transition: var(--transition);
-    }
-    
-    .material-form .form-control:focus,
-    .material-form .form-select:focus {
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(30, 132, 73, 0.1);
-    }
-    
-    .form-control-lg {
-        padding: 1rem 1.25rem;
-        font-size: 1.1rem;
-    }
-    
-    .input-group-text {
-        background-color: #f8f9fa;
-        border: 2px solid #e2e8f0;
-        border-right: none;
-    }
-    
-    .material-form .form-control:focus + .input-group-text {
-        border-color: var(--primary);
-    }
-    
-    .card-header.bg-primary {
-        background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
-    }
-</style>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const userSelect = document.getElementById('userSelect');
-        const keteranganInput = document.querySelector('input[name="keterangan"]');
-        const jumlahInput = document.querySelector('input[name="jumlah"]');
-        const bulanSelect = document.querySelector('select[name="bulan"]');
-        const tahunSelect = document.querySelector('select[name="tahun"]');
-        
-        const previewNama = document.getElementById('previewNama');
-        const previewKeterangan = document.getElementById('previewKeterangan');
-        const previewPeriode = document.getElementById('previewPeriode');
-        const previewJumlah = document.getElementById('previewJumlah');
-        
-        // Update preview function
-        function updatePreview() {
-            // Update student name
-            const selectedOption = userSelect.options[userSelect.selectedIndex];
-            previewNama.textContent = selectedOption.value ? selectedOption.text.split(' - ')[0] : '-';
-            
-            // Update description
-            previewKeterangan.textContent = keteranganInput.value || '-';
-            
-            // Update amount
-            const amount = jumlahInput.value ? parseInt(jumlahInput.value).toLocaleString('id-ID') : '0';
-            previewJumlah.textContent = `Rp ${amount}`;
-            
-            // Update period
-            const bulan = bulanSelect.value;
-            const tahun = tahunSelect.value;
-            if (bulan && tahun) {
-                const monthNames = [
-                    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-                    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-                ];
-                previewPeriode.textContent = `${monthNames[bulan - 1]} ${tahun}`;
-            } else {
-                previewPeriode.textContent = '-';
-            }
-        }
-        
-        // Add event listeners
-        userSelect.addEventListener('change', updatePreview);
-        keteranganInput.addEventListener('input', updatePreview);
-        jumlahInput.addEventListener('input', updatePreview);
-        bulanSelect.addEventListener('change', updatePreview);
-        tahunSelect.addEventListener('change', updatePreview);
-        
-        // Format amount input
-        jumlahInput.addEventListener('blur', function() {
-            if (this.value) {
-                this.value = parseInt(this.value).toString();
-            }
-        });
-        
-        // Form validation
-        const form = document.getElementById('tagihanForm');
-        const submitBtn = document.getElementById('submitBtn');
-        
-        form.addEventListener('submit', function(e) {
-            if (!form.checkValidity()) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                // Add Bootstrap validation styles
-                const inputs = form.querySelectorAll('input, select');
-                inputs.forEach(input => {
-                    if (!input.checkValidity()) {
-                        input.classList.add('is-invalid');
-                    }
-                });
-                
-                // Show error message
-                alert('Harap lengkapi semua field yang wajib diisi!');
-            } else {
-                // Show loading state
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Menyimpan...';
-            }
-        });
-        
-        // Remove validation styles on input
-        const inputs = form.querySelectorAll('input, select');
-        inputs.forEach(input => {
-            input.addEventListener('input', function() {
-                if (this.checkValidity()) {
-                    this.classList.remove('is-invalid');
-                }
-            });
-        });
-        
-        // Initialize preview
-        updatePreview();
-    });
-</script>
 @endsection

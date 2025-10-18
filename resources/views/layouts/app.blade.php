@@ -13,6 +13,9 @@
     
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    {{-- Icon Awesome --}}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     
     <!-- Custom CSS -->
     <style>
@@ -872,7 +875,6 @@
     <div class="app-container">
         <!-- Sidebar Overlay for Mobile -->
         <div class="sidebar-overlay" id="sidebarOverlay"></div>
-        
         <!-- Sidebar -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -953,36 +955,43 @@
               </div>
               @else
               <div class="nav-section">
-                    <div class="nav-section-title">Menu Murid</div>
-                    <div class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
-                            <i class="bi bi-speedometer2"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
-                            <i class="bi bi-receipt"></i>
-                            <span>Tagihan Saya</span>
-                        </a>
-                    </div>
-                    <div class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
-                            <i class="bi bi-clock-history"></i>
-                            <span>Riwayat</span>
-                        </a>
-                    </div>
-                </div>
-                
-                <div class="nav-section">
-                    <div class="nav-section-title">Lainnya</div>
-                    <div class="nav-item">
-                        <a class="nav-link {{ request()->routeIs('murid.profile') ? 'active' : '' }}" href="{{ route('murid.profile') }}">
-                            <i class="bi bi-person"></i>
-                            <span>Profile Saya</span>
-                        </a>
-                    </div>
-                </div>
+                  <div class="nav-section-title">Menu Murid</div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
+                          <i class="bi bi-speedometer2"></i>
+                          <span>Dashboard</span>
+                      </a>
+                  </div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
+                          <i class="bi bi-receipt"></i>
+                          <span>Tagihan Saya</span>
+                      </a>
+                  </div>
+                  <!-- TAMBAH MENU BAYAR SPP -->
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('murid.bayar.spp.page') ? 'active' : '' }}" href="{{ route('murid.bayar.spp.page') }}">
+                          <i class="bi bi-credit-card"></i>
+                          <span>Bayar SPP</span>
+                      </a>
+                  </div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
+                          <i class="bi bi-clock-history"></i>
+                          <span>Riwayat</span>
+                      </a>
+                  </div>
+              </div>
+
+              <div class="nav-section">
+                  <div class="nav-section-title">Lainnya</div>
+                  <div class="nav-item">
+                      <a class="nav-link {{ request()->routeIs('murid.profile') ? 'active' : '' }}" href="{{ route('murid.profile') }}">
+                          <i class="bi bi-person"></i>
+                          <span>Profile Saya</span>
+                      </a>
+                  </div>
+              </div>
               @endif
           </nav>
 
@@ -1026,11 +1035,11 @@
         <!-- Main Content -->
         <main class="main-content" id="mainContent">
             @auth
-            {{-- <div class="top-navbar">
+            <div class="top-navbar">
                 <button class="mobile-toggle" id="mobileToggle">
                     <i class="bi bi-list"></i>
                 </button>
-                <div class="top-nav-actions">
+                {{-- <div class="top-nav-actions">
                     <!-- Notifications, messages, etc. can go here -->
                     <div class="dropdown">
                         <button class="btn btn-outline-primary btn-sm" type="button" id="notificationsDropdown" data-bs-toggle="dropdown">
@@ -1046,8 +1055,8 @@
                             <li><a class="dropdown-item text-center" href="#">Lihat semua</a></li>
                         </ul>
                     </div>
-                </div>
-            </div> --}}
+                </div> --}}
+            </div>
             @endauth
 
             <div class="content-wrapper">
