@@ -929,7 +929,7 @@
                           <span>Pembayaran Manual</span>
                       </a>
                   </div>
-                  
+             
                   <div class="nav-item">
                       <a class="nav-link {{ request()->routeIs('admin.pengeluaran.*') ? 'active' : '' }}" href="{{ route('admin.pengeluaran.index') }}">
                           <i class="bi bi-cash-coin"></i>

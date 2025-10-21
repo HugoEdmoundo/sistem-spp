@@ -428,19 +428,26 @@ class AdminController extends Controller
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'tagihan_id' => 'nullable|exists:tagihan,id',
-            'jenis_bayar' => 'required|string',
+            // 'tipe_bayar' => 'required|in:spp,lain', // PERUBAHAN: dari jenis_bayar ke tipe_bayar
             'keterangan' => 'required|string',
+            'keterangan_lain' => 'required_if:tipe_bayar,lain|string|nullable', // TAMBAHAN
             'jumlah' => 'required|numeric|min:0',
-            'metode' => 'required|string',
-            'tanggal_bayar' => 'required|date'
+            'metode' => 'required|in:Tunai,Transfer,QRIS',
+            'tanggal_bayar' => 'required|date',
+            'bulan_mulai' => 'required_if:tipe_bayar,spp|nullable|integer|min:1|max:12',
+            'bulan_akhir' => 'required_if:tipe_bayar,spp|nullable|integer|min:1|max:12',
+            'tahun' => 'required_if:tipe_bayar,spp|nullable|integer'
         ]);
 
         DB::transaction(function () use ($request) {
+            // Tentukan jenis bayar berdasarkan tipe
+            $jenisBayar = $request->tipe_bayar == 'spp' ? 'lunas' : 'lunas';
+
             // Buat pembayaran TANPA bukti
             $pembayaran = Pembayaran::create([
                 'user_id' => $request->user_id,
                 'tagihan_id' => $request->tagihan_id,
-                'jenis_bayar' => $request->jenis_bayar,
+                'jenis_bayar' => $jenisBayar, // PERUBAHAN: gunakan jenis_bayar
                 'keterangan' => $request->keterangan,
                 'jumlah' => $request->jumlah,
                 'metode' => $request->metode,
@@ -450,6 +457,11 @@ class AdminController extends Controller
                 'admin_id' => auth()->id(),
                 'catatan_admin' => $request->catatan_admin
             ]);
+
+            // Jika SPP, buat/buat tagihan SPP
+            if ($request->tipe_bayar == 'spp') {
+                $this->handlePembayaranSPP($request, $pembayaran);
+            }
 
             // Update status tagihan jika ada tagihan terkait
             if ($request->tagihan_id) {
@@ -482,6 +494,53 @@ class AdminController extends Controller
         });
 
         return redirect()->route('admin.pembayaran.history')->with('success', 'Pembayaran manual berhasil dicatat.');
+    }
+
+    // Method untuk handle pembayaran SPP
+    private function handlePembayaranSPP($request, $pembayaran)
+    {
+        $bulanMulai = $request->bulan_mulai;
+        $bulanAkhir = $request->bulan_akhir;
+        $tahun = $request->tahun;
+
+        for ($bulan = $bulanMulai; $bulan <= $bulanAkhir; $bulan++) {
+            // Cek apakah tagihan SPP sudah ada
+            $tagihanSPP = Tagihan::where('user_id', $request->user_id)
+                ->where('jenis', 'spp')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->first();
+
+            if (!$tagihanSPP) {
+                // Buat tagihan SPP baru
+                $tagihanSPP = Tagihan::create([
+                    'user_id' => $request->user_id,
+                    'jenis' => 'spp',
+                    'keterangan' => "SPP Bulan " . $this->getNamaBulan($bulan) . " " . $tahun,
+                    'bulan' => $bulan,
+                    'tahun' => $tahun,
+                    'jumlah' => $request->jumlah / ($bulanAkhir - $bulanMulai + 1), // Bagi rata per bulan
+                    'status' => 'success' // Langsung success karena sudah dibayar
+                ]);
+            } else {
+                // Update tagihan yang sudah ada
+                $tagihanSPP->update(['status' => 'success']);
+            }
+
+            // Link pembayaran dengan tagihan (gunakan cara yang sesuai dengan struktur database Anda)
+            // Ini tergantung bagaimana relasi antara pembayaran dan tagihan
+        }
+    }
+
+    // Helper untuk mendapatkan nama bulan
+    private function getNamaBulan($bulan)
+    {
+        $monthNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        return $monthNames[$bulan] ?? 'Unknown';
     }
 
     // ==================== LAPORAN & EXPORT ====================

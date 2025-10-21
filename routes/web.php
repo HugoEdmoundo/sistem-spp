@@ -13,18 +13,11 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
 
-    // Admin Routes - tambah pengeluaran
+    // Admin Routes - Group yang benar
     Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
-        
-        // Pengeluaran Management
-        Route::get('/pengeluaran', [AdminController::class, 'pengeluaranIndex'])->name('admin.pengeluaran.index');
-        Route::get('/pengeluaran/create', [AdminController::class, 'pengeluaranCreate'])->name('admin.pengeluaran.create');
-        Route::post('/pengeluaran', [AdminController::class, 'pengeluaranStore'])->name('admin.pengeluaran.store');
-        Route::get('/pengeluaran/{id}/edit', [AdminController::class, 'pengeluaranEdit'])->name('admin.pengeluaran.edit');
-        Route::put('/pengeluaran/{id}', [AdminController::class, 'pengeluaranUpdate'])->name('admin.pengeluaran.update');
-        Route::delete('/pengeluaran/{id}', [AdminController::class, 'pengeluaranDestroy'])->name('admin.pengeluaran.destroy');
-    });
-
+    
+    // Dashboard
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     
     // Murid Management
     Route::get('/murid', [AdminController::class, 'muridIndex'])->name('admin.murid.index');
@@ -36,11 +29,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::post('/murid/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admin.murid.reset-password');
     
     // Tagihan Management
-    // routes/web.php - Hanya yang diperlukan saja
     Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('admin.tagihan.index');
     Route::get('/tagihan/create', [AdminController::class, 'tagihanCreate'])->name('admin.tagihan.create');
     Route::post('/tagihan', [AdminController::class, 'tagihanStore'])->name('admin.tagihan.store');
     Route::delete('/tagihan/{tagihan}', [AdminController::class, 'tagihanDestroy'])->name('admin.tagihan.destroy');
+    
+    // Pengeluaran Management
+    Route::get('/pengeluaran', [AdminController::class, 'pengeluaranIndex'])->name('admin.pengeluaran.index');
+    Route::get('/pengeluaran/create', [AdminController::class, 'pengeluaranCreate'])->name('admin.pengeluaran.create');
+    Route::post('/pengeluaran', [AdminController::class, 'pengeluaranStore'])->name('admin.pengeluaran.store');
+    Route::get('/pengeluaran/{id}/edit', [AdminController::class, 'pengeluaranEdit'])->name('admin.pengeluaran.edit');
+    Route::put('/pengeluaran/{id}', [AdminController::class, 'pengeluaranUpdate'])->name('admin.pengeluaran.update');
+    Route::delete('/pengeluaran/{id}', [AdminController::class, 'pengeluaranDestroy'])->name('admin.pengeluaran.destroy');
     
     // Pembayaran Management
     Route::get('/pembayaran', [AdminController::class, 'pembayaranIndex'])->name('admin.pembayaran.index');
@@ -49,6 +49,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::post('/pembayaran/{id}/approve', [AdminController::class, 'approvePembayaran'])->name('admin.pembayaran.approve');
     Route::post('/pembayaran/{id}/reject', [AdminController::class, 'rejectPembayaran'])->name('admin.pembayaran.reject');
     
+    // Pembayaran Manual Tagihan
+   // Pembayaran Manual
+    Route::get('/admin/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
+    Route::post('/admin/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
+
+    // SAMA UNTUK SPP MANUAL
+    Route::get('/pembayaran/spp-create', [AdminController::class, 'sppManualCreate'])->name('admin.pembayaran.spp.create');
+    Route::post('/pembayaran/spp-store', [AdminController::class, 'sppManualStore'])->name('admin.pembayaran.spp.store');
+    
     // SPP Setting
     Route::get('/spp-setting', [AdminController::class, 'sppSetting'])->name('admin.spp-setting');
     Route::post('/spp-setting', [AdminController::class, 'updateSppSetting'])->name('admin.spp-setting.update');
@@ -56,22 +65,24 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     // Profile
     Route::get('/profile', [AdminController::class, 'profile'])->name('admin.profile');
     Route::post('/profile', [AdminController::class, 'updateProfile'])->name('admin.profile.update');
-
-    // Pembayaran Manual
-    Route::get('/admin/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
-    Route::post('/admin/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
+    
+    // Kuitansi & Laporan PDF
+    Route::get('/kuitansi/{pembayaranId}', [AdminController::class, 'generateKuitansi'])->name('admin.kuitansi.pdf');
+    Route::get('/laporan-keuangan-pdf', [AdminController::class, 'laporanKeuanganPdf'])->name('admin.laporan.keuangan.pdf');
+    Route::get('/rekap-spp/{muridId}', [AdminController::class, 'rekapSppMurid'])->name('admin.rekap.spp.murid');
     
     // Laporan & Export
     Route::get('/laporan', [AdminController::class, 'laporanIndex'])->name('admin.laporan.index');
-    Route::post('/export/tagihan', [AdminController::class, 'exportTagihan'])->name('admin.export.tagihan');
-    Route::post('/export/pembayaran', [AdminController::class, 'exportPembayaran'])->name('admin.export.pembayaran');
-    Route::post('/export/murid', [AdminController::class, 'exportMurid'])->name('admin.export.murid');
+    Route::get('/export/tagihan', [AdminController::class, 'exportTagihan'])->name('admin.export.tagihan');
+    Route::get('/export/pembayaran', [AdminController::class, 'exportPembayaran'])->name('admin.export.pembayaran');
+    Route::get('/export/murid', [AdminController::class, 'exportMurid'])->name('admin.export.murid');
     
-    // Backup
+    // Backup Database
     Route::get('/backup', [AdminController::class, 'backupIndex'])->name('admin.backup.index');
-    Route::post('/backup', [AdminController::class, 'createBackup'])->name('admin.backup.create');
+    Route::post('/backup/create', [AdminController::class, 'createBackup'])->name('admin.backup.create');
     Route::get('/backup/download/{file}', [AdminController::class, 'downloadBackup'])->name('admin.backup.download');
-    Route::delete('/backup/{file}', [AdminController::class, 'deleteBackup'])->name('admin.backup.delete');
+    Route::delete('/backup/delete/{file}', [AdminController::class, 'deleteBackup'])->name('admin.backup.delete');
+});
 });
 
 // Murid Routes
@@ -86,6 +97,9 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/pembayaran/history', [MuridController::class, 'pembayaranHistory'])->name('murid.pembayaran.history');
     Route::get('/profile', [MuridController::class, 'profile'])->name('murid.profile');
     Route::post('/profile', [MuridController::class, 'updateProfile'])->name('murid.profile.update');
+    // Routes untuk Murid
+    Route::get('/murid/kuitansi/{pembayaranId}', [MuridController::class, 'generateKuitansi'])->name('murid.kuitansi.pdf');
+    Route::get('/murid/rekap-spp', [MuridController::class, 'rekapSppSaya'])->name('murid.rekap.spp');
     
 });
 
