@@ -6,14 +6,6 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4>Riwayat Pembayaran Saya</h4>
-    <div>
-        <a href="{{ route('murid.dashboard') }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left me-2"></i> Dashboard
-        </a>
-        <a href="{{ route('murid.tagihan.index') }}" class="btn btn-primary">
-            <i class="bi bi-file-invoice me-2"></i> Lihat Tagihan
-        </a>
-    </div>
 </div>
 
 <div class="card">
