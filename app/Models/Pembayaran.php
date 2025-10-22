@@ -19,12 +19,15 @@ class Pembayaran extends Model
         'jenis_bayar',
         'tanggal_proses',
         'admin_id',
-        'tanggal_upload'
+        'tanggal_upload',
+        'tanggal_bayar', // TAMBAH INI
+        'catatan_admin' // TAMBAH INI JIKA PERLU
     ];
 
     protected $casts = [
         'tanggal_upload' => 'datetime',
         'tanggal_proses' => 'datetime',
+        'tanggal_bayar' => 'datetime', // TAMBAH INI
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'jumlah' => 'decimal:2'

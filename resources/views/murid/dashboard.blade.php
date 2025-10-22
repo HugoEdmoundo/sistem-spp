@@ -34,7 +34,7 @@
     <div class="col-md-3 mb-4">
         <div class="stat-card danger">
             <div class="stat-icon">
-                <i class="bi bi-x-circle"></i>
+                <i class="bi bi-x-circle me-2 text-danger"></i>
             </div>
             <div class="stat-value">{{ $tagihanRejected }}</div>
             <div class="stat-label">Ditolak</div>

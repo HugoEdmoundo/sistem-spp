@@ -6,7 +6,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4>Pembayaran Menunggu Verifikasi</h4>
     <a href="{{ route('admin.pembayaran.history') }}" class="btn btn-primary">
-        <i class="bi bi-history me-2"></i> Riwayat Pembayaran
+        <i class="bi bi-history me-2"></i>Riwayat Pembayaran
     </a>
 </div>
 

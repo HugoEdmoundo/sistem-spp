@@ -420,129 +420,138 @@ class AdminController extends Controller
         $murid = User::where('role', 'murid')->where('aktif', true)->get();
         $tagihan = Tagihan::where('status', 'unpaid')->get();
         
-        return view('admin.pembayaran.manual-create', compact('murid', 'tagihan'));
+        // Ambil nominal SPP dari settings
+        $sppSetting = SppSetting::orderBy('berlaku_mulai', 'desc')->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        
+        return view('admin.pembayaran.manual-create', compact('murid', 'tagihan', 'nominalSpp'));
     }
-
     public function pembayaranManualStore(Request $request)
     {
+        // Validasi dasar
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'tagihan_id' => 'nullable|exists:tagihan,id',
-            // 'tipe_bayar' => 'required|in:spp,lain', // PERUBAHAN: dari jenis_bayar ke tipe_bayar
-            'keterangan' => 'required|string',
-            'keterangan_lain' => 'required_if:tipe_bayar,lain|string|nullable', // TAMBAHAN
+            'tipe_pembayaran' => 'required|in:spp,tagihan',
             'jumlah' => 'required|numeric|min:0',
             'metode' => 'required|in:Tunai,Transfer,QRIS',
-            'tanggal_bayar' => 'required|date',
-            'bulan_mulai' => 'required_if:tipe_bayar,spp|nullable|integer|min:1|max:12',
-            'bulan_akhir' => 'required_if:tipe_bayar,spp|nullable|integer|min:1|max:12',
-            'tahun' => 'required_if:tipe_bayar,spp|nullable|integer'
+            'keterangan' => 'required|string',
         ]);
 
-        DB::transaction(function () use ($request) {
-            // Tentukan jenis bayar berdasarkan tipe
-            $jenisBayar = $request->tipe_bayar == 'spp' ? 'lunas' : 'lunas';
+        // Validasi conditional - PERBAIKI NAMA TABEL
+        if ($request->tipe_pembayaran == 'tagihan') {
+            $request->validate([
+                'tagihan_id' => 'required|exists:tagihans,id' // UBAH: tagihan -> tagihans
+            ]);
+        } else {
+            $request->validate([
+                'bulan_mulai' => 'required|integer|min:1|max:12',
+                'bulan_akhir' => 'required|integer|min:1|max:12',
+                'tahun' => 'required|integer'
+            ]);
+        }
 
-            // Buat pembayaran TANPA bukti
+        
+        try {
+            DB::beginTransaction();
+
+            // Buat pembayaran - HAPUS FIELD YANG BELUM ADA DI DATABASE
             $pembayaran = Pembayaran::create([
                 'user_id' => $request->user_id,
-                'tagihan_id' => $request->tagihan_id,
-                'jenis_bayar' => $jenisBayar, // PERUBAHAN: gunakan jenis_bayar
+                'tagihan_id' => $request->tipe_pembayaran == 'tagihan' ? $request->tagihan_id : null,
+                'jenis_bayar' => 'lunas',
                 'keterangan' => $request->keterangan,
                 'jumlah' => $request->jumlah,
                 'metode' => $request->metode,
-                'bukti' => null, // Tidak ada bukti untuk pembayaran manual
-                'status' => 'accepted', // Langsung diterima
+                'bukti' => null,
+                'status' => 'accepted',
+                // 'tanggal_bayar' => $request->tanggal_bayar, // SEMENTARA DIHAPUS
                 'tanggal_proses' => now(),
                 'admin_id' => auth()->id(),
-                'catatan_admin' => $request->catatan_admin
+                // 'catatan_admin' => $request->catatan_admin, // SEMENTARA DIHAPUS
+                'tanggal_upload' => now()
             ]);
 
-            // Jika SPP, buat/buat tagihan SPP
-            if ($request->tipe_bayar == 'spp') {
-                $this->handlePembayaranSPP($request, $pembayaran);
+            // Handle berdasarkan tipe
+            if ($request->tipe_pembayaran == 'spp') {
+                $this->handleSPP($request);
+            } else {
+                $this->handleTagihan($request);
             }
 
-            // Update status tagihan jika ada tagihan terkait
-            if ($request->tagihan_id) {
-                $tagihan = Tagihan::find($request->tagihan_id);
-                if ($tagihan) {
-                    $tagihan->update(['status' => 'success']);
-                }
-            }
-
-            // Buat notifikasi untuk murid
+            // Notifikasi
             Notification::create([
                 'user_id' => $request->user_id,
                 'type' => 'pembayaran_manual',
                 'title' => 'Pembayaran Manual',
-                'message' => "Admin telah mencatat pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " untuk " . $request->keterangan,
-                'data' => [
-                    'pembayaran_id' => $pembayaran->id,
-                    'jumlah' => $request->jumlah,
-                    'keterangan' => $request->keterangan,
-                    'metode' => $request->metode
-                ],
+                'message' => "Pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " telah dicatat",
                 'related_type' => 'App\Models\Pembayaran',
                 'related_id' => $pembayaran->id
             ]);
 
-            // Kirim event realtime ke murid
-            if (class_exists('App\Events\PembayaranManualDibuat')) {
-                broadcast(new PembayaranManualDibuat($pembayaran));
-            }
-        });
+            DB::commit();
 
-        return redirect()->route('admin.pembayaran.history')->with('success', 'Pembayaran manual berhasil dicatat.');
+            return redirect()->route('admin.pembayaran.history')->with('success', 'Pembayaran manual berhasil dicatat.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage())->withInput();
+        }
     }
 
-    // Method untuk handle pembayaran SPP
-    private function handlePembayaranSPP($request, $pembayaran)
+    private function handleSPP($request)
     {
         $bulanMulai = $request->bulan_mulai;
         $bulanAkhir = $request->bulan_akhir;
         $tahun = $request->tahun;
+        
+        // Hitung jumlah bulan
+        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+        $jumlahPerBulan = $request->jumlah / $jumlahBulan;
 
         for ($bulan = $bulanMulai; $bulan <= $bulanAkhir; $bulan++) {
-            // Cek apakah tagihan SPP sudah ada
-            $tagihanSPP = Tagihan::where('user_id', $request->user_id)
+            $tagihan = Tagihan::where('user_id', $request->user_id)
                 ->where('jenis', 'spp')
                 ->where('bulan', $bulan)
                 ->where('tahun', $tahun)
                 ->first();
 
-            if (!$tagihanSPP) {
-                // Buat tagihan SPP baru
-                $tagihanSPP = Tagihan::create([
+            if (!$tagihan) {
+                // Buat tagihan baru
+                Tagihan::create([
                     'user_id' => $request->user_id,
                     'jenis' => 'spp',
-                    'keterangan' => "SPP Bulan " . $this->getNamaBulan($bulan) . " " . $tahun,
+                    'keterangan' => 'SPP Bulan ' . $this->getNamaBulan($bulan) . ' ' . $tahun,
                     'bulan' => $bulan,
                     'tahun' => $tahun,
-                    'jumlah' => $request->jumlah / ($bulanAkhir - $bulanMulai + 1), // Bagi rata per bulan
-                    'status' => 'success' // Langsung success karena sudah dibayar
+                    'jumlah' => $jumlahPerBulan,
+                    'status' => 'success'
                 ]);
             } else {
-                // Update tagihan yang sudah ada
-                $tagihanSPP->update(['status' => 'success']);
+                // Update tagihan existing
+                $tagihan->update(['status' => 'success']);
             }
-
-            // Link pembayaran dengan tagihan (gunakan cara yang sesuai dengan struktur database Anda)
-            // Ini tergantung bagaimana relasi antara pembayaran dan tagihan
         }
     }
 
-    // Helper untuk mendapatkan nama bulan
+    private function handleTagihan($request)
+    {
+        $tagihan = Tagihan::find($request->tagihan_id);
+        if ($tagihan) {
+            $tagihan->update(['status' => 'success']);
+        }
+    }
+
     private function getNamaBulan($bulan)
     {
-        $monthNames = [
+        $bulanArr = [
             1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
             5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
             9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
         ];
-        return $monthNames[$bulan] ?? 'Unknown';
+        return $bulanArr[$bulan] ?? '';
     }
 
+    
     // ==================== LAPORAN & EXPORT ====================
     public function laporanIndex()
     {
