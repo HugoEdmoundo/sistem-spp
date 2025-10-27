@@ -206,14 +206,81 @@ class MuridController extends Controller
         return back()->with('success', 'Bukti pembayaran berhasil diupload. Menunggu verifikasi admin.');
     }
 
-        // Trigger event dan email - COMMENT DULU UNTUK TEST
-        // event(new PembayaranDibuat($pembayaran));
-        
-        // Kirim email ke admin - COMMENT DULU UNTUK TEST
-        // $adminUsers = \App\Models\User::where('role', 'admin')->get();
-        // foreach ($adminUsers as $admin) {
-        //     Mail::to($admin->email)->send(new PembayaranNotification($pembayaran));
-        // }
+    // app/Http/Controllers/MuridController.php
+
+    // Method untuk upload ulang pembayaran SPP yang direject
+    public function uploadUlangSpp(Request $request, $id)
+    {
+        $pembayaranLama = Pembayaran::where('user_id', auth()->id())
+            ->where('status', 'rejected')
+            ->findOrFail($id);
+
+        $request->validate([
+            'metode' => 'required|string',
+            'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
+            'keterangan' => 'required|string'
+        ]);
+
+        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+        // Buat pembayaran baru berdasarkan yang direject
+        Pembayaran::create([
+            'tagihan_id' => $pembayaranLama->tagihan_id,
+            'user_id' => auth()->id(),
+            'metode' => $request->metode,
+            'bukti' => $buktiPath,
+            'jumlah' => $pembayaranLama->jumlah,
+            'status' => 'pending',
+            'alasan_reject' => null,
+            'keterangan' => $request->keterangan,
+            'jenis_bayar' => 'lunas',
+            'tanggal_upload' => now(),
+            'tanggal_bayar' => now(),
+            'tahun' => $pembayaranLama->tahun,
+            'bulan_mulai' => $pembayaranLama->bulan_mulai,
+            'bulan_akhir' => $pembayaranLama->bulan_akhir
+        ]);
+
+        return redirect()->route('murid.pembayaran.history')
+            ->with('success', 'Bukti pembayaran SPP berhasil diupload ulang. Menunggu verifikasi admin.');
+    }
+
+    public function uploadUlangTagihan(Request $request, $id)
+    {
+        $pembayaranLama = Pembayaran::where('user_id', auth()->id())
+            ->where('status', 'rejected')
+            ->findOrFail($id);
+
+        $request->validate([
+            'metode' => 'required|string',
+            'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048'
+        ]);
+
+        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+        // Buat pembayaran baru
+        Pembayaran::create([
+            'tagihan_id' => $pembayaranLama->tagihan_id,
+            'user_id' => auth()->id(),
+            'metode' => $request->metode,
+            'bukti' => $buktiPath,
+            'jumlah' => $pembayaranLama->jumlah,
+            'status' => 'pending',
+            'alasan_reject' => null,
+            'keterangan' => $pembayaranLama->keterangan,
+            'jenis_bayar' => 'lunas',
+            'tanggal_upload' => now(),
+            'tanggal_bayar' => now()
+        ]);
+
+        // Update status tagihan menjadi pending
+        if ($pembayaranLama->tagihan) {
+            $pembayaranLama->tagihan->update(['status' => 'pending']);
+        }
+
+        return redirect()->route('murid.pembayaran.history')
+            ->with('success', 'Bukti pembayaran tagihan berhasil diupload ulang. Menunggu verifikasi admin.');
+    }
 
     public function profile()
     {

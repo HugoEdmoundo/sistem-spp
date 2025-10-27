@@ -53,10 +53,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
    // Pembayaran Manual
     Route::get('/admin/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
     Route::post('/admin/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
-
-    // SAMA UNTUK SPP MANUAL
-    Route::get('/pembayaran/spp-create', [AdminController::class, 'sppManualCreate'])->name('admin.pembayaran.spp.create');
-    Route::post('/pembayaran/spp-store', [AdminController::class, 'sppManualStore'])->name('admin.pembayaran.spp.store');
     
     // SPP Setting
     Route::get('/spp-setting', [AdminController::class, 'sppSetting'])->name('admin.spp-setting');
@@ -100,6 +96,9 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     // Routes untuk Murid
     Route::get('/murid/kuitansi/{pembayaranId}', [MuridController::class, 'generateKuitansi'])->name('murid.kuitansi.pdf');
     Route::get('/murid/rekap-spp', [MuridController::class, 'rekapSppSaya'])->name('murid.rekap.spp');
+
+    Route::post('/murid/pembayaran/{id}/upload-ulang', [MuridController::class, 'uploadUlangTagihan'])->name('murid.pembayaran.upload-ulang');
+    Route::post('/murid/spp/{id}/upload-ulang', [MuridController::class, 'uploadUlangSpp'])->name('murid.spp.upload-ulang');
     
 });
 

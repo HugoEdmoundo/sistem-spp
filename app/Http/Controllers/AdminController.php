@@ -279,6 +279,52 @@ class AdminController extends Controller
         return view('admin.pembayaran.history', compact('pembayaran', 'pembayaranPending'));
     }
 
+    public function rejectPembayaran(Request $request, $id)
+    {
+        $request->validate([
+            'alasan_reject' => 'required|string|min:5|max:500'
+        ]);
+
+        // Debug: Cek data yang diterima
+        logger('Reject Request Data:', $request->all());
+        logger('Auth User:', [auth()->user() ? auth()->user()->id : 'No user']);
+
+        $pembayaran = Pembayaran::with('tagihan')->find($id);
+        
+        if (!$pembayaran) {
+            logger('Pembayaran not found:', ['id' => $id]);
+            return back()->with('error', 'Pembayaran tidak ditemukan.');
+        }
+
+        logger('Pembayaran before update:', $pembayaran->toArray());
+
+        // Update langsung tanpa transaction dulu
+        $pembayaran->status = 'rejected';
+        $pembayaran->alasan_reject = $request->alasan_reject;
+        $pembayaran->tanggal_proses = now();
+        $pembayaran->admin_id = auth()->id();
+        
+        $saved = $pembayaran->save();
+        
+        logger('Pembayaran after update:', [
+            'saved' => $saved,
+            'pembayaran' => $pembayaran->fresh()->toArray()
+        ]);
+
+        if ($saved) {
+            // Update tagihan jika ada
+            if ($pembayaran->tagihan) {
+                $pembayaran->tagihan->update(['status' => 'unpaid']);
+                logger('Tagihan updated:', ['tagihan_id' => $pembayaran->tagihan->id]);
+            }
+
+            return back()->with('success', 'Pembayaran berhasil ditolak dengan alasan.');
+        } else {
+            logger('Failed to save pembayaran');
+            return back()->with('error', 'Gagal menyimpan perubahan.');
+        }
+    }
+
     public function approvePembayaran($id)
     {
         DB::transaction(function () use ($id) {
@@ -311,48 +357,13 @@ class AdminController extends Controller
             ]);
 
             // Kirim event realtime ke murid
-            broadcast(new StatusPembayaranDiupdate($pembayaran));
+            if (class_exists('App\Events\StatusPembayaranDiupdate')) {
+                broadcast(new \App\Events\StatusPembayaranDiupdate($pembayaran));
+            }
         });
 
         return back()->with('success', 'Pembayaran berhasil disetujui.');
     }
-
-    public function rejectPembayaran($id)
-    {
-        $pembayaran = Pembayaran::with('tagihan')->findOrFail($id); // TAMBAH with('tagihan')
-        
-        $pembayaran->update([
-            'status' => 'rejected',
-               'tanggal_proses' => now(),
-            'admin_id' => auth()->id()
-        ]);
-
-        // TAMBAH: Jika ada tagihan terkait, update status tagihan ke 'unpaid'
-        if ($pembayaran->tagihan) {
-            $pembayaran->tagihan->update(['status' => 'unpaid']);
-        }
-
-        // Buat notifikasi untuk murid
-        Notification::create([
-            'user_id' => $pembayaran->user_id,
-            'type' => 'pembayaran_ditolak',
-            'title' => 'Pembayaran Ditolak',
-            'message' => "Pembayaran Anda sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . " ditolak. Silakan hubungi admin.",
-            'data' => [
-                'pembayaran_id' => $pembayaran->id,
-                'jumlah' => $pembayaran->jumlah,
-                'status' => 'rejected'
-            ],
-            'related_type' => 'App\Models\Pembayaran',
-            'related_id' => $pembayaran->id
-        ]);
-
-        // Kirim event realtime ke murid
-        broadcast(new StatusPembayaranDiupdate($pembayaran));
-
-        return back()->with('success', 'Pembayaran berhasil ditolak.');
-    }
-
     // Detail pembayaran
     public function showPembayaran($id)
     {

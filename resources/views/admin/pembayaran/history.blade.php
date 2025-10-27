@@ -49,10 +49,10 @@
                             <th>Metode</th>
                             <th>Jumlah</th>
                             <th>Status</th>
+                            <th>Alasan Reject</th>
                             <th>Bukti</th>
                             <th>Admin</th>
                             <th>Tanggal Proses</th>
-                            {{-- <th>Aksi</th> --}}
                         </tr>
                     </thead>
                     <tbody>
@@ -71,10 +71,10 @@
                                 @else
                                     <span class="badge bg-info">Manual</span>
                                     {{ $item->keterangan }}
-                                @endif
-                                @if($item->catatan_admin)
-                                <br>
-                                <small class="text-muted"><em>{{ $item->catatan_admin }}</em></small>
+                                    @if($item->range_bulan)
+                                    <br>
+                                    <small class="text-muted">{{ $item->range_bulan }}</small>
+                                    @endif
                                 @endif
                             </td>
                             <td>
@@ -95,6 +95,19 @@
                                     <span class="badge bg-danger">
                                         <i class="bi bi-x-circle me-1"></i>Ditolak
                                     </span>
+                                @endif
+                            </td>
+                            <td>
+                                @if($item->status == 'rejected' && $item->alasan_reject)
+                                    <button type="button" class="btn btn-sm btn-outline-danger" 
+                                            data-bs-toggle="popover" 
+                                            data-bs-title="Alasan Ditolak"
+                                            data-bs-content="{{ $item->alasan_reject }}"
+                                            data-bs-trigger="hover">
+                                        <i class="bi bi-exclamation-circle"></i> Lihat Alasan
+                                    </button>
+                                @else
+                                    <span class="text-muted">-</span>
                                 @endif
                             </td>
                             <td>
@@ -120,11 +133,6 @@
                                     <span class="text-muted">-</span>
                                 @endif
                             </td>
-                            {{-- <td>
-                                <a href="{{ route('admin.pembayaran.show', $item->id) }}" class="btn btn-sm btn-info" data-bs-toggle="tooltip" title="Detail Pembayaran">
-                                    <i class="bi bi-eye"></i>
-                                </a>
-                            </td> --}}
                         </tr>
                         @empty
                         <tr>
@@ -155,11 +163,11 @@
 
 @section('scripts')
 <script>
-    // Inisialisasi tooltip
     document.addEventListener('DOMContentLoaded', function() {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
+        // Inisialisasi popover untuk alasan reject
+        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl)
         });
     });
 </script>

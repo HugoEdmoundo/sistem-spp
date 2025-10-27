@@ -9,14 +9,6 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center">
                 <h4 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h4>
-                <div>
-                    <a href="{{ route('admin.laporan.index') }}" class="btn btn-outline-primary me-2">
-                        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Laporan
-                    </a>
-                    <a href="{{ route('admin.backup.index') }}" class="btn btn-outline-info">
-                        <i class="bi bi-database me-2"></i>Backup
-                    </a>
-                </div>
             </div>
         </div>
     </div>
