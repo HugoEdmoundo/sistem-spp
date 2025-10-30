@@ -117,7 +117,7 @@
                             <th>Username</th>
                             <th>NIS</th>
                             <th width="120" class="text-center">Status</th>
-                            <th width="200" class="text-center">Aksi</th>
+                            <th width="250" class="text-center">Aksi</th> <!-- Lebarkan kolom aksi -->
                         </tr>
                     </thead>
                     <tbody>
@@ -168,7 +168,16 @@
                             </td>
                             <td class="text-center align-middle">
                                 <div class="d-flex justify-content-center">
-                                    <a href="{{ route('admin.murid.edit', $item->id) }}" class="btn btn-sm btn-outline-primary mr-1" title="Edit Data">
+                                    <!-- TAMBAH TOMBOL DETAIL PEMBAYARAN -->
+                                    <a href="{{ route('admin.murid.pembayaran', $item->id) }}" 
+                                       class="btn btn-sm btn-outline-info mr-1" 
+                                       title="Lihat Pembayaran">
+                                        <i class="fas fa-credit-card"></i>
+                                    </a>
+                                    
+                                    <a href="{{ route('admin.murid.edit', $item->id) }}" 
+                                       class="btn btn-sm btn-outline-primary mr-1" 
+                                       title="Edit Data">
                                         <i class="fas fa-edit"></i>
                                     </a>
                                     
@@ -182,7 +191,7 @@
 
                                     <form action="{{ route('admin.murid.reset-password', $item->id) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-info" 
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" 
                                                 onclick="return confirm('Reset password murid {{ $item->nama }} ke 123456789?')"
                                                 title="Reset Password">
                                             <i class="fas fa-key"></i>

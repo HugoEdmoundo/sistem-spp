@@ -17,6 +17,47 @@
     </div>
 </div>
 
+{{-- resources/views/murid/bayar-spp.blade.php --}}
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>❌ Terjadi Kesalahan:</strong>
+        <ul class="mb-0">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if(session('error'))
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Gagal:</strong> {{ session('error') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <strong>✅ Berhasil:</strong> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if(session('info'))
+    <div class="alert alert-info alert-dismissible fade show" role="alert">
+        <strong>Informasi:</strong> {{ session('info') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if(session('warning'))
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <strong>⚠️ Peringatan:</strong> {{ session('warning') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
 <div class="row">
     <div class="col-lg-8">
         <div class="material-card">
@@ -328,4 +369,51 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePerhitungan();
 });
 </script>
+{{-- Tambahkan di file blade --}}
+<script>
+// Validasi real-time sebelum submit
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const bulanMulai = parseInt(document.getElementById('bulan_mulai').value);
+            const bulanAkhir = parseInt(document.getElementById('bulan_akhir').value);
+            const tahun = parseInt(document.getElementById('tahun').value);
+            
+            // Validasi bulan
+            if (bulanMulai > bulanAkhir) {
+                e.preventDefault();
+                showAlert('❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!', 'danger');
+                return;
+            }
+            
+            // Validasi tahun
+            const currentYear = new Date().getFullYear();
+            if (tahun < currentYear - 1 || tahun > currentYear + 1) {
+                e.preventDefault();
+                showAlert('❌ Tahun harus antara ' + (currentYear - 1) + ' dan ' + (currentYear + 1) + '!', 'danger');
+                return;
+            }
+        });
+    }
+    
+    // Fungsi untuk show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.querySelector('.container').prepend(alertDiv);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+});
+</script>
+
 @endsection

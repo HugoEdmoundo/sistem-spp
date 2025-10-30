@@ -2,6 +2,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\MuridController;
+use App\Http\Controllers\LaporanController;
 use Illuminate\Support\Facades\Route;
 
 // Auth Routes
@@ -12,12 +13,6 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Admin Routes
 Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
-
-    // Admin Routes - Group yang benar
-    Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
-    
-    // Dashboard
-    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('admin.dashboard');
     
     // Murid Management
     Route::get('/murid', [AdminController::class, 'muridIndex'])->name('admin.murid.index');
@@ -27,6 +22,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::put('/murid/{id}', [AdminController::class, 'muridUpdate'])->name('admin.murid.update');
     Route::post('/murid/{id}/toggle', [AdminController::class, 'muridToggle'])->name('admin.murid.toggle');
     Route::post('/murid/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admin.murid.reset-password');
+    Route::get('/murid/{id}/pembayaran', [AdminController::class, 'muridPembayaran'])->name('admin.murid.pembayaran');
     
     // Tagihan Management
     Route::get('/tagihan', [AdminController::class, 'tagihanIndex'])->name('admin.tagihan.index');
@@ -49,10 +45,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::post('/pembayaran/{id}/approve', [AdminController::class, 'approvePembayaran'])->name('admin.pembayaran.approve');
     Route::post('/pembayaran/{id}/reject', [AdminController::class, 'rejectPembayaran'])->name('admin.pembayaran.reject');
     
-    // Pembayaran Manual Tagihan
-   // Pembayaran Manual
-    Route::get('/admin/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
-    Route::post('/admin/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
+    // Pembayaran Manual
+    Route::get('/pembayaran/manual/create', [AdminController::class, 'pembayaranManualCreate'])->name('admin.pembayaran.manual.create');
+    Route::post('/pembayaran/manual/store', [AdminController::class, 'pembayaranManualStore'])->name('admin.pembayaran.manual.store');
     
     // SPP Setting
     Route::get('/spp-setting', [AdminController::class, 'sppSetting'])->name('admin.spp-setting');
@@ -62,28 +57,17 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/profile', [AdminController::class, 'profile'])->name('admin.profile');
     Route::post('/profile', [AdminController::class, 'updateProfile'])->name('admin.profile.update');
     
-    // Kuitansi & Laporan PDF
-    Route::get('/kuitansi/{pembayaranId}', [AdminController::class, 'generateKuitansi'])->name('admin.kuitansi.pdf');
-    Route::get('/laporan-keuangan-pdf', [AdminController::class, 'laporanKeuanganPdf'])->name('admin.laporan.keuangan.pdf');
-    Route::get('/rekap-spp/{muridId}', [AdminController::class, 'rekapSppMurid'])->name('admin.rekap.spp.murid');
-    
-    // Laporan & Export
-    Route::get('/laporan', [AdminController::class, 'laporanIndex'])->name('admin.laporan.index');
-    Route::get('/export/tagihan', [AdminController::class, 'exportTagihan'])->name('admin.export.tagihan');
-    Route::get('/export/pembayaran', [AdminController::class, 'exportPembayaran'])->name('admin.export.pembayaran');
-    Route::get('/export/murid', [AdminController::class, 'exportMurid'])->name('admin.export.murid');
-    
-    // Backup Database
-    Route::get('/backup', [AdminController::class, 'backupIndex'])->name('admin.backup.index');
-    Route::post('/backup/create', [AdminController::class, 'createBackup'])->name('admin.backup.create');
-    Route::get('/backup/download/{file}', [AdminController::class, 'downloadBackup'])->name('admin.backup.download');
-    Route::delete('/backup/delete/{file}', [AdminController::class, 'deleteBackup'])->name('admin.backup.delete');
-});
+    // Laporan Routes - DIPINDAH ke group terpisah untuk menghindari konflik
+    Route::prefix('laporan')->group(function () {
+        Route::get('/', [LaporanController::class, 'index'])->name('admin.laporan.index');
+        Route::get('/spp/export/excel/{tahun}', [LaporanController::class, 'exportSppExcel'])->name('admin.laporan.export.spp.excel');
+        Route::get('/spp/export/pdf/{tahun}', [LaporanController::class, 'exportSppPdf'])->name('admin.laporan.export.spp.pdf');
+        Route::get('/pengeluaran/export/excel/{tahun}', [LaporanController::class, 'exportPengeluaranExcel'])->name('admin.laporan.export.pengeluaran.excel');
+        Route::get('/pengeluaran/export/pdf/{tahun}', [LaporanController::class, 'exportPengeluaranPdf'])->name('admin.laporan.export.pengeluaran.pdf');
+    });
 });
 
 // Murid Routes
-
-// Routes Murid
 Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/dashboard', [MuridController::class, 'dashboard'])->name('murid.dashboard');
     Route::get('/tagihan', [MuridController::class, 'tagihanIndex'])->name('murid.tagihan.index');
@@ -93,23 +77,31 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/pembayaran/history', [MuridController::class, 'pembayaranHistory'])->name('murid.pembayaran.history');
     Route::get('/profile', [MuridController::class, 'profile'])->name('murid.profile');
     Route::post('/profile', [MuridController::class, 'updateProfile'])->name('murid.profile.update');
-    // Routes untuk Murid
-    Route::get('/murid/kuitansi/{pembayaranId}', [MuridController::class, 'generateKuitansi'])->name('murid.kuitansi.pdf');
-    Route::get('/murid/rekap-spp', [MuridController::class, 'rekapSppSaya'])->name('murid.rekap.spp');
-
-    Route::post('/murid/pembayaran/{id}/upload-ulang', [MuridController::class, 'uploadUlangTagihan'])->name('murid.pembayaran.upload-ulang');
-    Route::post('/murid/spp/{id}/upload-ulang', [MuridController::class, 'uploadUlangSpp'])->name('murid.spp.upload-ulang');
     
+    // Fixed routes - hapus prefix murid yang berulang
+    Route::get('/kuitansi/{pembayaranId}', [MuridController::class, 'generateKuitansi'])->name('murid.kuitansi.pdf');
+    Route::get('/rekap-spp', [MuridController::class, 'rekapSppSaya'])->name('murid.rekap.spp');
+    Route::post('/pembayaran/{id}/upload-ulang', [MuridController::class, 'uploadUlangTagihan'])->name('murid.pembayaran.upload-ulang');
+    Route::post('/spp/{id}/upload-ulang', [MuridController::class, 'uploadUlangSpp'])->name('murid.spp.upload-ulang');
 });
 
-// Laporan & Export
-Route::post('/admin/export/tagihan', [AdminController::class, 'exportTagihan'])->name('admin.export.tagihan');
-Route::post('/admin/export/pembayaran', [AdminController::class, 'exportPembayaran'])->name('admin.export.pembayaran');
-Route::post('/admin/export/murid', [AdminController::class, 'exportMurid'])->name('admin.export.murid');
-Route::get('/admin/laporan', [AdminController::class, 'laporanIndex'])->name('admin.laporan.index');
+// Validation Route - PERBAIKI: tambahkan use statement untuk Request
+Route::get('/validate-spp', function (Illuminate\Http\Request $request) {
+    $user = auth()->user();
+    $tahun = $request->tahun;
+    $bulanMulai = $request->bulan_mulai;
+    $bulanAkhir = $request->bulan_akhir;
 
-// Backup
-Route::get('/admin/backup', [AdminController::class, 'backupIndex'])->name('admin.backup.index');
-Route::post('/admin/backup', [AdminController::class, 'createBackup'])->name('admin.backup.create');
-Route::get('/admin/backup/download/{file}', [AdminController::class, 'downloadBackup'])->name('admin.backup.download');
-Route::delete('/admin/backup/{file}', [AdminController::class, 'deleteBackup'])->name('admin.backup.delete');
+    $validasi = $user->bisaBayarSpp($tahun, $bulanMulai, $bulanAkhir);
+    
+    $bulanNames = array_map(function($bulan) {
+        return \App\Models\User::getNamaBulanStatic($bulan);
+    }, $validasi['sudah_dibayar']);
+
+    return response()->json([
+        'bisa_dibayar' => $validasi['bisa_dibayar'],
+        'sudah_dibayar' => $validasi['sudah_dibayar'],
+        'sudah_dibayar_names' => implode(', ', $bulanNames),
+        'bisa_proses' => $validasi['bisa_proses']
+    ]);
+})->middleware('auth');

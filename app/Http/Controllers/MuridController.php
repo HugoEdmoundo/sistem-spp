@@ -30,7 +30,7 @@ class MuridController extends Controller
             ->where('status', 'pending')
             ->count();
 
-        // PERBAIKAN: Hitung PEMBAYARAN yang rejected, bukan TAGIHAN
+        // Hitung PEMBAYARAN yang rejected
         $pembayaranRejectedCount = Pembayaran::where('user_id', $user->id)
             ->where('status', 'rejected')
             ->count();
@@ -58,35 +58,118 @@ class MuridController extends Controller
             ->take(5)
             ->get();
 
+        // Ambri riwayat pembayaran terbaru
+        $riwayatPembayaran = Pembayaran::where('user_id', $user->id)
+            ->latest()
+            ->take(5)
+            ->get();
+
         return view('murid.dashboard', [
             'totalTagihan' => $totalTagihan,
             'totalDibayar' => $totalDibayar,
             'tagihanPending' => $tagihanPending,
-            'tagihanRejected' => $pembayaranRejectedCount, // GUNAKAN COUNT PEMBAYARAN REJECTED
+            'tagihanRejected' => $pembayaranRejectedCount,
             'pembayaranPending' => $pembayaranPending,
             'pembayaranRejected' => $pembayaranRejected,
             'nominalSpp' => $nominalSpp,
-            'tagihan' => $tagihanTerbaru
+            'tagihan' => $tagihanTerbaru,
+            'riwayatPembayaran' => $riwayatPembayaran
         ]);
     }
-    
+
+    // METHOD REKAP SPP YANG DIPERLUKAN
+    public function rekapSppSaya()
+    {
+        $user = auth()->user();
+        $tahun = request('tahun', date('Y'));
+        
+        $statusSpp = $user->getStatusSppTahunan($tahun);
+        
+        // Ambil semua tahun yang ada pembayaran SPP
+        $tahunTersedia = Pembayaran::where('user_id', $user->id)
+            ->whereNull('tagihan_id')
+            ->where('status', 'accepted')
+            ->distinct()
+            ->pluck('tahun')
+            ->toArray();
+            
+        // Tambahkan tahun saat ini jika belum ada
+        if (!in_array(date('Y'), $tahunTersedia)) {
+            $tahunTersedia[] = date('Y');
+        }
+        
+        sort($tahunTersedia);
+
+        return view('murid.rekap-spp', [
+            'statusSpp' => $statusSpp,
+            'tahun' => $tahun,
+            'tahunTersedia' => $tahunTersedia,
+            'user' => $user
+        ]);
+    }
+
+    // METHOD GENERATE KUITANSI YANG DIPERLUKAN
+    public function generateKuitansi($pembayaranId)
+    {
+        $pembayaran = Pembayaran::where('user_id', auth()->id())
+            ->with(['user', 'admin'])
+            ->findOrFail($pembayaranId);
+
+        // Pastikan pembayaran sudah diterima
+        if ($pembayaran->status !== 'accepted') {
+            return redirect()->route('murid.pembayaran.history')
+                ->with('error', '❌ Kuitansi hanya bisa diunduh untuk pembayaran yang sudah diterima.');
+        }
+
+        $pdf = Pdf::loadView('murid.kuitansi-pdf', compact('pembayaran'));
+        
+        $filename = 'kuitansi-' . $pembayaran->id . '-' . now()->format('Y-m-d') . '.pdf';
+        
+        return $pdf->download($filename);
+    }
+
+    // METHOD TAGIHAN INDEX YANG DIPERLUKAN
     public function tagihanIndex()
     {
-        $tagihan = Tagihan::where('user_id', auth()->id())
+        $user = auth()->user();
+        $tagihan = Tagihan::where('user_id', $user->id)
             ->latest()
             ->paginate(15);
         
         return view('murid.tagihan.index', compact('tagihan'));
     }
 
+    // METHOD PEMBAYARAN HISTORY YANG DIPERLUKAN
+    public function pembayaranHistory()
+    {
+        $user = auth()->user();
+        $pembayaran = Pembayaran::where('user_id', $user->id)
+            ->with(['tagihan', 'admin'])
+            ->latest()
+            ->paginate(15);
+        
+        return view('murid.pembayaran.history', compact('pembayaran'));
+    }
+
+    // METHOD PROFILE YANG DIPERLUKAN
+    public function profile()
+    {
+        $user = auth()->user();
+        return view('murid.profile', compact('user'));
+    }
+
+    // METHOD SHOW BAYAR SPP YANG DIPERLUKAN
     public function showBayarSpp()
     {
-        // Ambil nominal SPP saat ini
         $sppSetting = SppSetting::latest()->first();
         $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        
+        $tahun = date('Y');
+        $bulanSekarang = date('n');
 
-        return view('murid.bayar-spp', compact('nominalSpp'));
+        return view('murid.bayar-spp', compact('nominalSpp', 'tahun', 'bulanSekarang'));
     }
+
 
     public function bayarSpp(Request $request)
     {
@@ -106,9 +189,24 @@ class MuridController extends Controller
         }
 
         $user = auth()->user();
+        
+        // VALIDASI: Cek apakah ada bulan yang sudah dibayar
+        $validasiPembayaran = $user->bisaBayarSpp($request->tahun, $request->bulan_mulai, $request->bulan_akhir);
+        
+        if (!$validasiPembayaran['bisa_proses']) {
+            $bulanSudahDibayar = $validasiPembayaran['sudah_dibayar'];
+            $bulanNames = array_map(function($bulan) {
+                return $this->getNamaBulan($bulan);
+            }, $bulanSudahDibayar);
+            
+            return back()->withErrors([
+                'bulan_mulai' => 'Bulan ' . implode(', ', $bulanNames) . ' sudah dibayar. Silakan pilih bulan lain.'
+            ])->withInput();
+        }
+
+        // Lanjutkan proses pembayaran...
         $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
 
-        // Buat pembayaran tanpa tagihan
         $pembayaran = Pembayaran::create([
             'tagihan_id' => null,
             'user_id' => $user->id,
@@ -118,59 +216,25 @@ class MuridController extends Controller
             'status' => 'pending',
             'keterangan' => $request->keterangan,
             'jenis_bayar' => 'lunas',
-            'tanggal_upload' => now()
+            'tanggal_upload' => now(),
+            'tahun' => $request->tahun,
+            'bulan_mulai' => $request->bulan_mulai,
+            'bulan_akhir' => $request->bulan_akhir
         ]);
 
         return redirect()->route('murid.bayar.spp.page')->with('success', 'Pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
     }
 
-    // public function bayarSpp(Request $request)
-    // {
-    //     $request->validate([
-    //         'bulan_mulai' => 'required|integer|min:1|max:12',
-    //         'bulan_akhir' => 'required|integer|min:1|max:12',
-    //         'tahun' => 'required|integer',
-    //         'jumlah' => 'required|numeric|min:0',
-    //         'metode' => 'required|string',
-    //         'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
-    //         'keterangan' => 'required|string'
-    //     ]);
-
-    //     // Validasi bulan
-    //     if ($request->bulan_mulai > $request->bulan_akhir) {
-    //         return back()->withErrors(['bulan_akhir' => 'Bulan akhir harus lebih besar atau sama dengan bulan mulai.']);
-    //     }
-
-    //     $user = auth()->user();
-    //     $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
-
-    //     // Buat pembayaran tanpa tagihan
-    //     $pembayaran = Pembayaran::create([
-    //         'tagihan_id' => null,
-    //         'user_id' => $user->id,
-    //         'metode' => $request->metode,
-    //         'bukti' => $buktiPath,
-    //         'jumlah' => $request->jumlah,
-    //         'status' => 'pending',
-    //         'keterangan' => $request->keterangan,
-    //         'jenis_bayar' => 'lunas',
-    //         'tanggal_upload' => now()
-    //     ]);
-
-    //     // Trigger event dan email - COMMENT DULU UNTUK TEST
-    //         // event(new PembayaranDibuat($pembayaran));
-            
-    //         // Kirim email ke admin - COMMENT DULU UNTUK TEST
-    //         // $adminUsers = \App\Models\User::where('role', 'admin')->get();
-    //         // foreach ($adminUsers as $admin) {
-    //         //     Mail::to($admin->email)->send(new PembayaranNotification($pembayaran));
-    //         // }
-
-
-    //     return back()->with('success', 'Pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
-    // }
-     
-    
+    private function getNamaBulan($bulan): string
+    {
+        $bulanArr = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        return $bulanArr[$bulan] ?? '';
+    }
+        
     public function uploadBukti(Request $request, $id)
     {
         $tagihan = Tagihan::where('user_id', auth()->id())->findOrFail($id);
@@ -282,11 +346,6 @@ class MuridController extends Controller
             ->with('success', 'Bukti pembayaran tagihan berhasil diupload ulang. Menunggu verifikasi admin.');
     }
 
-    public function profile()
-    {
-        return view('murid.profile');
-    }
-
     public function updateProfile(Request $request)
     {
         $user = auth()->user();
@@ -327,15 +386,5 @@ class MuridController extends Controller
         $user->update($data);
 
         return redirect()->route('murid.profile')->with('success', 'Profile berhasil diperbarui!');
-    }
-
-    public function pembayaranHistory()
-    {
-        $pembayaran = Pembayaran::where('user_id', auth()->id())
-            ->with(['tagihan', 'admin'])
-            ->latest()
-            ->paginate(15);
-        
-        return view('murid.pembayaran.history', compact('pembayaran'));
     }
 }

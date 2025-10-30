@@ -437,6 +437,8 @@ class AdminController extends Controller
         
         return view('admin.pembayaran.manual-create', compact('murid', 'tagihan', 'nominalSpp'));
     }
+    
+    // Di AdminController.php - Method pembayaranManualStore
     public function pembayaranManualStore(Request $request)
     {
         // Validasi dasar
@@ -448,24 +450,61 @@ class AdminController extends Controller
             'keterangan' => 'required|string',
         ]);
 
-        // Validasi conditional - PERBAIKI NAMA TABEL
         if ($request->tipe_pembayaran == 'tagihan') {
             $request->validate([
-                'tagihan_id' => 'required|exists:tagihans,id' // UBAH: tagihan -> tagihans
+                'tagihan_id' => 'required|exists:tagihans,id'
             ]);
+
+            // Validasi: cek apakah tagihan sudah lunas
+            $tagihan = Tagihan::find($request->tagihan_id);
+            if ($tagihan->status == 'success') {
+                return back()->with('error', '❌ Tagihan ini sudah lunas! Tidak bisa melakukan pembayaran manual.')->withInput();
+            }
         } else {
             $request->validate([
                 'bulan_mulai' => 'required|integer|min:1|max:12',
                 'bulan_akhir' => 'required|integer|min:1|max:12',
                 'tahun' => 'required|integer'
             ]);
-        }
 
+            // Validasi range bulan
+            if ($request->bulan_mulai > $request->bulan_akhir) {
+                return back()->with('error', '❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!')->withInput();
+            }
+
+            // VALIDASI: Cek duplikasi SPP
+            $user = User::find($request->user_id);
+            $validasiPembayaran = $user->bisaBayarSpp($request->tahun, $request->bulan_mulai, $request->bulan_akhir);
+            
+            if (!$validasiPembayaran['bisa_proses']) {
+                $bulanSudahDibayar = $validasiPembayaran['sudah_dibayar'];
+                $bulanNames = array_map(function($bulan) {
+                    return User::getNamaBulanStatic($bulan);
+                }, $bulanSudahDibayar);
+                
+                $errorMessage = '❌ Tidak bisa melakukan pembayaran manual karena bulan ' . implode(', ', $bulanNames) . ' sudah dibayar. Silakan pilih bulan lain.';
+                return back()->with('error', $errorMessage)->withInput();
+            }
+
+            // Validasi jumlah SPP
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+            $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
+            $jumlahSeharusnya = $nominalSppPerBulan * $jumlahBulan;
+            
+            // Beri toleransi ±10% untuk pembayaran manual
+            $toleransi = $jumlahSeharusnya * 0.1;
+            $minimal = $jumlahSeharusnya - $toleransi;
+            $maksimal = $jumlahSeharusnya + $toleransi;
+            
+            if ($request->jumlah < $minimal || $request->jumlah > $maksimal) {
+                return back()->with('error', "❌ Jumlah pembayaran tidak sesuai! Untuk $jumlahBulan bulan seharusnya Rp " . number_format($jumlahSeharusnya, 0, ',', '.') . " (±10%)")->withInput();
+            }
+        }
         
         try {
             DB::beginTransaction();
 
-            // Buat pembayaran - HAPUS FIELD YANG BELUM ADA DI DATABASE
             $pembayaran = Pembayaran::create([
                 'user_id' => $request->user_id,
                 'tagihan_id' => $request->tipe_pembayaran == 'tagihan' ? $request->tagihan_id : null,
@@ -475,21 +514,21 @@ class AdminController extends Controller
                 'metode' => $request->metode,
                 'bukti' => null,
                 'status' => 'accepted',
-                // 'tanggal_bayar' => $request->tanggal_bayar, // SEMENTARA DIHAPUS
                 'tanggal_proses' => now(),
                 'admin_id' => auth()->id(),
-                // 'catatan_admin' => $request->catatan_admin, // SEMENTARA DIHAPUS
-                'tanggal_upload' => now()
+                'tanggal_upload' => now(),
+                'tahun' => $request->tahun ?? null,
+                'bulan_mulai' => $request->bulan_mulai ?? null,
+                'bulan_akhir' => $request->bulan_akhir ?? null
             ]);
 
-            // Handle berdasarkan tipe
             if ($request->tipe_pembayaran == 'spp') {
                 $this->handleSPP($request);
             } else {
                 $this->handleTagihan($request);
             }
 
-            // Notifikasi
+            // Buat notifikasi
             Notification::create([
                 'user_id' => $request->user_id,
                 'type' => 'pembayaran_manual',
@@ -501,11 +540,13 @@ class AdminController extends Controller
 
             DB::commit();
 
-            return redirect()->route('admin.pembayaran.history')->with('success', 'Pembayaran manual berhasil dicatat.');
+            return redirect()->route('admin.pembayaran.history')
+                ->with('success', '✅ Pembayaran manual berhasil dicatat!')
+                ->with('info', '💰 Pembayaran telah otomatis diverifikasi dan tercatat dalam sistem.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage())->withInput();
+            return back()->with('error', '❌ Gagal mencatat pembayaran manual: ' . $e->getMessage())->withInput();
         }
     }
 
@@ -531,7 +572,7 @@ class AdminController extends Controller
                 Tagihan::create([
                     'user_id' => $request->user_id,
                     'jenis' => 'spp',
-                    'keterangan' => 'SPP Bulan ' . $this->getNamaBulan($bulan) . ' ' . $tahun,
+                    'keterangan' => 'SPP Bulan ' . User::getNamaBulanStatic($bulan) . ' ' . $tahun,
                     'bulan' => $bulan,
                     'tahun' => $tahun,
                     'jumlah' => $jumlahPerBulan,
@@ -551,110 +592,36 @@ class AdminController extends Controller
             $tagihan->update(['status' => 'success']);
         }
     }
-
-    private function getNamaBulan($bulan)
-    {
-        $bulanArr = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
-        return $bulanArr[$bulan] ?? '';
-    }
-
     
-    // ==================== LAPORAN & EXPORT ====================
-    public function laporanIndex()
-    {
-        return view('admin.laporan.index');
-    }
+    // ==================== MURID PEMBAYARAN ====================
 
-    public function exportTagihan(Request $request)
+    public function muridPembayaran($id)
     {
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
+        $murid = User::where('role', 'murid')->findOrFail($id);
+        $tahun = request('tahun', date('Y'));
         
-        $filename = 'laporan-tagihan-' . now()->format('Y-m-d') . '.xlsx';
-        
-        return Excel::download(new TagihanExport($startDate, $endDate), $filename);
-    }
+        // Ambil semua pembayaran murid
+        $pembayaran = Pembayaran::where('user_id', $id)
+            ->with(['admin', 'tagihan'])
+            ->latest()
+            ->get();
 
-    public function exportPembayaran(Request $request)
-    {
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
+        // Gunakan method yang sudah diperbaiki
+        $statusSpp = $murid->getStatusSppTahunan($tahun);
         
-        $filename = 'laporan-pembayaran-' . now()->format('Y-m-d') . '.xlsx';
+        // Hitung total yang sudah dibayar (hanya yang accepted)
+        $totalDibayar = $pembayaran->where('status', 'accepted')->sum('jumlah');
         
-        return Excel::download(new PembayaranExport($startDate, $endDate), $filename);
-    }
+        // Hitung pembayaran pending untuk badge
+        $pembayaranPendingCount = Pembayaran::where('status', 'pending')->count();
 
-    public function exportMurid()
-    {
-        $filename = 'data-murid-' . now()->format('Y-m-d') . '.xlsx';
-        return Excel::download(new MuridExport(), $filename);
-    }
-
-    // ==================== BACKUP DATABASE ====================
-    public function backupIndex()
-    {
-        $backups = [];
-        $files = Storage::files('backups');
-        
-        foreach ($files as $file) {
-            $backups[] = [
-                'name' => basename($file),
-                'size' => $this->formatBytes(Storage::size($file)),
-                'date' => \Carbon\Carbon::createFromTimestamp(Storage::lastModified($file))->format('d/m/Y H:i')
-            ];
-        }
-        
-        // Sort by date descending
-        usort($backups, function($a, $b) {
-            return strtotime($b['date']) - strtotime($a['date']);
-        });
-        
-        return view('admin.backup.index', compact('backups'));
-    }
-
-    public function createBackup()
-    {
-        \Artisan::call('backup:run');
-        
-        return back()->with('success', 'Backup database berhasil dibuat.');
-    }
-
-    public function downloadBackup($file)
-    {
-        $path = "backups/{$file}";
-        
-        if (!Storage::exists($path)) {
-            return back()->with('error', 'File backup tidak ditemukan.');
-        }
-        
-        return Storage::download($path);
-    }
-
-    public function deleteBackup($file)
-    {
-        $path = "backups/{$file}";
-        
-        if (Storage::exists($path)) {
-            Storage::delete($path);
-            return back()->with('success', 'Backup berhasil dihapus.');
-        }
-        
-        return back()->with('error', 'File backup tidak ditemukan.');
-    }
-
-    private function formatBytes($size, $precision = 2)
-    {
-        if ($size > 0) {
-            $base = log($size) / log(1024);
-            $suffixes = array(' bytes', ' KB', ' MB', ' GB', ' TB');
-            return round(pow(1024, $base - floor($base)), $precision) . $suffixes[floor($base)];
-        }
-        
-        return '0 bytes';
+        return view('admin.murid.pembayaran', compact(
+            'murid',
+            'pembayaran',
+            'statusSpp',
+            'tahun',
+            'totalDibayar',
+            'pembayaranPendingCount'
+        ));
     }
 }

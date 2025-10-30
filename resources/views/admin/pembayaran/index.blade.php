@@ -240,7 +240,7 @@
 <!-- JavaScript -->
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Debug form submission (only in development)
+        // Debug form submissiochn (only in development)
         @if(app()->environment('local'))
             document.querySelectorAll('[id^="rejectForm"]').forEach(form => {
                 form.addEventListener('submit', function(e) {
