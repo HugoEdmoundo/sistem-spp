@@ -131,6 +131,8 @@
           z-index: 1000;
           box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
           transform: translateX(0);
+          display: flex;
+          flex-direction: column;
         }
 
         .sidebar-header {
@@ -139,6 +141,7 @@
           display: flex;
           align-items: center;
           justify-content: space-between;
+          position: relative;
         }
 
         .sidebar-header .brand {
@@ -151,6 +154,8 @@
 
         .sidebar-header .brand i {
           margin-right: 0.5rem;
+          font-size: 1.8rem;
+          color: var(--accent);
         }
 
         .sidebar-toggle {
@@ -159,12 +164,24 @@
           color: white;
           font-size: 1.25rem;
           cursor: pointer;
-          display: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          transition: var(--transition);
+        }
+
+        .sidebar-toggle:hover {
+          background: rgba(255, 255, 255, 0.1);
+          transform: scale(1.1);
         }
 
         .sidebar-nav {
           padding: 1rem 0;
           flex: 1;
+          overflow-y: auto;
         }
 
         .nav-section {
@@ -183,6 +200,7 @@
 
         .nav-item {
           margin-bottom: 0.25rem;
+          position: relative;
         }
 
         .nav-link {
@@ -192,18 +210,37 @@
           color: rgba(255, 255, 255, 0.85);
           transition: var(--transition);
           border-left: 3px solid transparent;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .nav-link::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+          transition: var(--transition);
+        }
+
+        .nav-link:hover::before {
+          left: 100%;
         }
 
         .nav-link:hover {
           background: rgba(255, 255, 255, 0.1);
           color: white;
           border-left-color: rgba(255, 255, 255, 0.3);
+          transform: translateX(5px);
         }
 
         .nav-link.active {
           background: rgba(255, 255, 255, 0.15);
           color: white;
           border-left-color: var(--accent);
+          box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
         }
 
         .nav-link i {
@@ -211,6 +248,12 @@
           font-size: 1.1rem;
           width: 20px;
           text-align: center;
+          transition: var(--transition);
+        }
+
+        .nav-link:hover i {
+          transform: scale(1.2);
+          color: var(--accent);
         }
 
         .nav-badge {
@@ -221,6 +264,19 @@
           padding: 0.25rem 0.5rem;
           font-size: 0.75rem;
           font-weight: 600;
+          animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+          0% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.1);
+          }
+          100% {
+            transform: scale(1);
+          }
         }
 
         .sidebar-footer {
@@ -232,15 +288,23 @@
         .user-profile {
           display: flex;
           align-items: center;
+          position: relative;
         }
 
         .user-avatar {
-          width: 40px;
-          height: 40px;
+          width: 45px;
+          height: 45px;
           border-radius: 50%;
           object-fit: cover;
           margin-right: 0.75rem;
-          border: 2px solid rgba(255, 255, 255, 0.2);
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          transition: var(--transition);
+          box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .user-avatar:hover {
+          transform: scale(1.1);
+          border-color: var(--accent);
         }
 
         .user-info {
@@ -258,16 +322,34 @@
           color: rgba(255, 255, 255, 0.7);
         }
 
-        .user-dropdown {
-          background: none;
-          border: none;
-          color: rgba(255, 255, 255, 0.7);
-          cursor: pointer;
+        .logout-btn {
+          background: rgba(231, 76, 60, 0.2);
+          border: 1px solid rgba(231, 76, 60, 0.3);
+          color: rgba(255, 255, 255, 0.9);
+          padding: 0.5rem 1rem;
+          border-radius: 25px;
+          font-size: 0.875rem;
+          font-weight: 500;
           transition: var(--transition);
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          width: 100%;
+          justify-content: center;
+          margin-top: 1rem;
         }
 
-        .user-dropdown:hover {
+        .logout-btn:hover {
+          background: rgba(231, 76, 60, 0.3);
+          border-color: rgba(231, 76, 60, 0.5);
           color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+        }
+
+        .logout-btn i {
+          font-size: 1rem;
         }
 
         /* ================ MAIN CONTENT ================ */
@@ -691,6 +773,33 @@
           font-size: 1.25rem;
           cursor: pointer;
           margin-right: 1rem;
+          transition: var(--transition);
+        }
+
+        .mobile-toggle:hover {
+          background: var(--secondary);
+          transform: scale(1.05);
+        }
+
+        /* Sidebar Toggle Button */
+        .sidebar-toggle {
+          background: none;
+          border: none;
+          color: white;
+          font-size: 1.25rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          transition: var(--transition);
+        }
+
+        .sidebar-toggle:hover {
+          background: rgba(255, 255, 255, 0.1);
+          transform: scale(1.1);
         }
 
         /* Responsive */
@@ -705,7 +814,7 @@
           .nav-link span,
           .nav-badge,
           .user-info,
-          .user-dropdown {
+          .logout-btn span {
             display: none;
           }
           
@@ -759,6 +868,12 @@
             height: 36px;
           }
           
+          .logout-btn {
+            justify-content: center;
+            padding: 0.5rem;
+            width: auto;
+          }
+          
           .main-content {
             margin-left: 70px;
             width: calc(100% - 70px);
@@ -774,7 +889,7 @@
           .sidebar.expanded .nav-link span,
           .sidebar.expanded .nav-badge,
           .sidebar.expanded .user-info,
-          .sidebar.expanded .user-dropdown {
+          .sidebar.expanded .logout-btn span {
             display: block;
           }
           
@@ -805,6 +920,12 @@
           
           .sidebar.expanded .user-avatar {
             margin-right: 0.75rem;
+          }
+          
+          .sidebar.expanded .logout-btn {
+            justify-content: flex-start;
+            padding: 0.5rem 1rem;
+            width: 100%;
           }
           
           .main-content.sidebar-expanded {
@@ -886,6 +1007,9 @@
                     <i class="bi bi-wallet2"></i>
                     <span>SPP App</span>
                 </a>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
             </div>
 
             @auth
@@ -1017,7 +1141,7 @@
                   </div>
               </div>
               @endif
-          </nav>
+            </nav>
 
             <div class="sidebar-footer">
                 <div class="user-profile">
@@ -1035,53 +1159,29 @@
                         <div class="user-name">{{ auth()->user()->nama }}</div>
                         <div class="user-role">{{ auth()->user()->isAdmin() ? 'Administrator' : 'Murid' }}</div>
                     </div>
-                    <div class="dropdown">
-                        <button class="user-dropdown" type="button" id="userDropdown" data-bs-toggle="dropdown">
-                            <i class="bi bi-three-dots-vertical"></i>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a class="dropdown-item text-danger" href="{{ route('logout') }}" 
-                                  onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
-                                    <i class="bi bi-box-arrow-right me-2"></i>Logout
-                                </a>
-                                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
-                                    @csrf
-                                </form>
-                            </li>
-                        </ul>
-                    </div>
                 </div>
+                
+                <!-- Tombol Logout Langsung -->
+                <button class="logout-btn" onclick="document.getElementById('logout-form').submit()">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Logout</span>
+                </button>
             </div>
             @endauth
         </aside>
 
         <!-- Main Content -->
         <main class="main-content" id="mainContent">
-            @auth
+            {{-- @auth
             <div class="top-navbar">
                 <button class="mobile-toggle" id="mobileToggle">
                     <i class="bi bi-list"></i>
                 </button>
-                {{-- <div class="top-nav-actions">
-                    <!-- Notifications, messages, etc. can go here -->
-                    <div class="dropdown">
-                        <button class="btn btn-outline-primary btn-sm" type="button" id="notificationsDropdown" data-bs-toggle="dropdown">
-                            <i class="bi bi-bell"></i>
-                            <span class="badge bg-danger">3</span>
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><h6 class="dropdown-header">Notifikasi</h6></li>
-                            <li><a class="dropdown-item" href="#">Pembayaran baru dari Andi</a></li>
-                            <li><a class="dropdown-item" href="#">Tagihan bulanan telah dibuat</a></li>
-                            <li><a class="dropdown-item" href="#">Pengingat: Laporan bulanan</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item text-center" href="#">Lihat semua</a></li>
-                        </ul>
-                    </div>
-                </div> --}}
+                <div class="page-title">
+                    <h1>@yield('title', 'Dashboard')</h1>
+                </div>
             </div>
-            @endauth
+            @endauth --}}
 
             <div class="content-wrapper">
                 @if(session('success'))
@@ -1124,6 +1224,16 @@
                 if (window.innerWidth <= 768) {
                     sidebarOverlay.classList.toggle('active');
                 }
+                
+                // Update toggle button icon
+                const icon = sidebarToggle.querySelector('i');
+                if (sidebar.classList.contains('expanded')) {
+                    icon.classList.remove('bi-chevron-left');
+                    icon.classList.add('bi-chevron-right');
+                } else {
+                    icon.classList.remove('bi-chevron-right');
+                    icon.classList.add('bi-chevron-left');
+                }
             }
             
             // Desktop toggle
@@ -1143,6 +1253,11 @@
                         sidebar.classList.remove('expanded');
                         mainContent.classList.remove('sidebar-expanded');
                         sidebarOverlay.classList.remove('active');
+                        
+                        // Update toggle button icon
+                        const icon = sidebarToggle.querySelector('i');
+                        icon.classList.remove('bi-chevron-right');
+                        icon.classList.add('bi-chevron-left');
                     }
                 });
             }
@@ -1155,12 +1270,17 @@
                         sidebar.classList.remove('expanded');
                         mainContent.classList.remove('sidebar-expanded');
                         sidebarOverlay.classList.remove('active');
+                        
+                        // Update toggle button icon
+                        const icon = sidebarToggle.querySelector('i');
+                        icon.classList.remove('bi-chevron-right');
+                        icon.classList.add('bi-chevron-left');
                     }
                 });
             });
             
             // Material Design Ripple Effect
-            const buttons = document.querySelectorAll('.btn');
+            const buttons = document.querySelectorAll('.btn, .logout-btn');
             buttons.forEach(button => {
                 button.addEventListener('click', function(e) {
                     const ripple = document.createElement('span');
@@ -1189,6 +1309,13 @@
                     }, 600);
                 });
             });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768) {
+                    sidebarOverlay.classList.remove('active');
+                }
+            });
         });
 
         // Add ripple animation
@@ -1203,6 +1330,11 @@
         `;
         document.head.appendChild(style);
     </script>
+    
+    <!-- Hidden logout form -->
+    <form id="logout-form" action="{{ route('logout') }}" method="POST" class="d-none">
+        @csrf
+    </form>
     
     @stack('scripts')
 </body>

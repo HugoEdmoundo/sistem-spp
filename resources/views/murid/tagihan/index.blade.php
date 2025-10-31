@@ -6,9 +6,6 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4>Daftar Semua Tagihan</h4>
-    <a href="{{ route('murid.dashboard') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Kembali ke Dashboard
-    </a>
 </div>
 
 <div class="card">
