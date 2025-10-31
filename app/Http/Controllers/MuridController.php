@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 use App\Models\Tagihan;
 use App\Models\Pembayaran;
 use App\Models\SppSetting;
+use App\Helpers\NumberHelper;
 use App\Events\PembayaranDibuat;
 use App\Mail\PembayaranNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class MuridController extends Controller
 {
@@ -110,24 +112,85 @@ class MuridController extends Controller
 
     // METHOD GENERATE KUITANSI YANG DIPERLUKAN
     public function generateKuitansi($pembayaranId)
-    {
+{
+    try {
         $pembayaran = Pembayaran::where('user_id', auth()->id())
-            ->with(['user', 'admin'])
+            ->with(['user', 'admin', 'tagihan'])
             ->findOrFail($pembayaranId);
 
-        // Pastikan pembayaran sudah diterima
         if ($pembayaran->status !== 'accepted') {
             return redirect()->route('murid.pembayaran.history')
                 ->with('error', '❌ Kuitansi hanya bisa diunduh untuk pembayaran yang sudah diterima.');
         }
 
-        $pdf = Pdf::loadView('murid.kuitansi-pdf', compact('pembayaran'));
+        $data = [
+            'pembayaran' => $pembayaran,
+            'tanggal_sekarang' => now()->format('d F Y'),
+            'jam_sekarang' => now()->format('H:i:s'),
+        ];
+
+        // Generate PDF dengan setting A4
+        $pdf = Pdf::loadView('murid.kuitansi-pdf', $data)
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'defaultFont' => 'Times New Roman',
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'chroot' => public_path(),
+                'dpi' => 150
+            ]);
         
-        $filename = 'kuitansi-' . $pembayaran->id . '-' . now()->format('Y-m-d') . '.pdf';
+        $filename = 'Kuitansi-' . $pembayaran->user->nama . '-' . now()->format('Y-m-d') . '.pdf';
         
         return $pdf->download($filename);
+
+    } catch (\Exception $e) {
+        \Log::error('Error generating kuitansi: ' . $e->getMessage());
+        return redirect()->route('murid.pembayaran.history')
+            ->with('error', '❌ Gagal generate kuitansi. Silakan coba lagi.');
+    }
+}
+
+    // Tambahkan method helper untuk terbilang
+    private function terbilang($angka)
+    {
+        return $this->convertToTerbilang($angka);
     }
 
+    // Method konversi angka ke terbilang
+    private function convertToTerbilang($angka) 
+    {
+        $angka = abs($angka);
+        $bilangan = array('', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas');
+        
+        if ($angka < 12) {
+            return $bilangan[$angka];
+        } else if ($angka < 20) {
+            return $bilangan[$angka - 10] . ' Belas';
+        } else if ($angka < 100) {
+            $hasil_bagi = floor($angka / 10);
+            $hasil_mod = $angka % 10;
+            return trim(sprintf('%s Puluh %s', $bilangan[$hasil_bagi], $bilangan[$hasil_mod]));
+        } else if ($angka < 200) {
+            return sprintf('Seratus %s', $this->convertToTerbilang($angka - 100));
+        } else if ($angka < 1000) {
+            $hasil_bagi = floor($angka / 100);
+            $hasil_mod = $angka % 100;
+            return trim(sprintf('%s Ratus %s', $bilangan[$hasil_bagi], $this->convertToTerbilang($hasil_mod)));
+        } else if ($angka < 2000) {
+            return trim(sprintf('Seribu %s', $this->convertToTerbilang($angka - 1000)));
+        } else if ($angka < 1000000) {
+            $hasil_bagi = floor($angka / 1000);
+            $hasil_mod = $angka % 1000;
+            return sprintf('%s Ribu %s', $this->convertToTerbilang($hasil_bagi), $this->convertToTerbilang($hasil_mod));
+        } else if ($angka < 1000000000) {
+            $hasil_bagi = floor($angka / 1000000);
+            $hasil_mod = $angka % 1000000;
+            return trim(sprintf('%s Juta %s', $this->convertToTerbilang($hasil_bagi), $this->convertToTerbilang($hasil_mod)));
+        }
+        
+        return 'Angka terlalu besar';
+    }
     // METHOD TAGIHAN INDEX YANG DIPERLUKAN
     public function tagihanIndex()
     {

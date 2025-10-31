@@ -56,6 +56,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     // Profile
     Route::get('/profile', [AdminController::class, 'profile'])->name('admin.profile');
     Route::post('/profile', [AdminController::class, 'updateProfile'])->name('admin.profile.update');
+
+    Route::get('/kuitansi/{pembayaranId}', [AdminController::class, 'generateKuitansi'])->name('admin.kuitansi.pdf');
+    // Riwayat Pembayaran
+    Route::get('/pembayaran/history', [AdminController::class, 'pembayaranHistory'])->name('admin.pembayaran.history');
     
     // Laporan Routes - DIPINDAH ke group terpisah untuk menghindari konflik
     Route::prefix('laporan')->group(function () {

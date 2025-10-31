@@ -15,7 +15,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.min.js"></script>
 
@@ -915,17 +914,19 @@
                   
                   <!-- Menu Pembayaran (Verifikasi) -->
                   <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('admin.pembayaran.index') || request()->routeIs('admin.pembayaran.history') || request()->routeIs('admin.pembayaran.show') ? 'active' : '' }}" href="{{ route('admin.pembayaran.index') }}">
-                          <i class="bi bi-credit-card"></i>
-                          <span>Pembayaran</span>
-                          @php
-                              $pendingCount = $pembayaranPendingCount ?? \App\Models\Pembayaran::where('status', 'pending')->count();
-                          @endphp
-                          @if($pendingCount > 0)
-                          <span class="nav-badge">{{ $pendingCount }}</span>
-                          @endif
-                      </a>
+                    <a class="nav-link {{ request()->routeIs('admin.pembayaran.index') || request()->routeIs('admin.pembayaran.show') ? 'active' : '' }}" 
+                      href="{{ route('admin.pembayaran.index') }}">
+                        <i class="bi bi-credit-card"></i>
+                        <span>Verifikasi Pembayaran</span>
+                        @php
+                            $pendingCount = $pembayaranPendingCount ?? \App\Models\Pembayaran::where('status', 'pending')->count();
+                        @endphp
+                        @if($pendingCount > 0)
+                        <span class="nav-badge">{{ $pendingCount }}</span>
+                        @endif
+                    </a>
                   </div>
+
                   
                   <!-- Menu Pembayaran Manual -->
                   <div class="nav-item">
@@ -941,6 +942,16 @@
                           <span>Pengeluaran</span>
                       </a>
                   </div>
+
+                 <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('admin.pembayaran.history') ? 'active' : '' }}" 
+                      href="{{ route('admin.pembayaran.history') }}">
+                        <i class="bi bi-clock-history"></i>
+                        <span>Riwayat Pembayaran</span>
+                    </a>
+                  </div>
+
+
 
                   {{-- resources/views/layouts/admin/sidebar.blade.php --}}
                   <div class="nav-item">

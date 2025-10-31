@@ -43,66 +43,6 @@
         </div>
     </div>
 
-    {{-- Tambahkan di view setelah filter --}}
-    <div class="alert alert-info">
-        <h6>🔍 Debug Detail - Filter Tahun {{ $tahun }}</h6>
-        
-        @php
-            // Hitung statistik
-            $totalBulanBayar = 0;
-            $totalBulanBelum = 0;
-            $muridDenganData = 0;
-            
-            if (is_array($dataMurid)) {
-                foreach ($dataMurid as $data) {
-                    $totalBulanBayar += $data['total_bulan_bayar'];
-                    $totalBulanBelum += $data['total_bulan_belum_bayar'];
-                    if ($data['total_bulan_bayar'] > 0) {
-                        $muridDenganData++;
-                    }
-                }
-            }
-        @endphp
-        
-        <p><strong>📊 Statistik Tahun {{ $tahun }}:</strong></p>
-        <ul class="mb-2">
-            <li>Murid dengan data: <strong>{{ $muridDenganData }}/{{ count($dataMurid) }}</strong></li>
-            <li>Total bulan bayar: <strong>{{ $totalBulanBayar }} bulan</strong></li>
-            <li>Total bulan belum: <strong>{{ $totalBulanBelum }} bulan</strong></li>
-        </ul>
-        
-        <p class="mb-1"><strong>🔢 Detail per Murid:</strong></p>
-        @if(is_array($dataMurid) && count($dataMurid) > 0)
-            @foreach($dataMurid as $index => $data)
-            <div class="mb-1">
-                <small>
-                    {{ $index + 1 }}. <strong>{{ $data['murid']->nama }}</strong>: 
-                    @if($data['total_bulan_bayar'] > 0)
-                        <span class="text-success">✅ {{ $data['total_bulan_bayar'] }} bulan</span>
-                    @else
-                        <span class="text-danger">❌ 0 bulan</span>
-                    @endif
-                    - 
-                    @if(count($data['sudah_bayar']) > 0)
-                        @foreach(array_slice($data['sudah_bayar'], 0, 3) as $bulan)
-                            <span class="badge bg-success">{{ $bulan['nama_bulan'] }}</span>
-                        @endforeach
-                        @if(count($data['sudah_bayar']) > 3)
-                            <span class="text-muted">+{{ count($data['sudah_bayar']) - 3 }} lagi</span>
-                        @endif
-                    @else
-                        <span class="text-muted">Tidak ada bulan bayar</span>
-                    @endif
-                </small>
-            </div>
-            @endforeach
-        @else
-            <div class="text-danger">
-                <strong>❌ Tidak ada data murid untuk tahun {{ $tahun }}!</strong>
-            </div>
-        @endif
-    </div>
-
     <div class="row g-3">
         <!-- Laporan SPP -->
         <div class="col-12">

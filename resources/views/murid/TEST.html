@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Surat Resmi Pesantren Ar-Rahman</title>
+  <style>
+    body {
+      font-family: "Times New Roman", serif;
+      margin: 40px 60px;
+      color: #000;
+    }
+
+    .kop-surat {
+      display: flex;
+      align-items: center;
+      border-bottom: 3px double #000;
+      padding-bottom: 10px;
+      margin-bottom: 25px;
+    }
+
+    .kop-surat .logo-kiri img {
+      width: 90px;
+      height: auto;
+    }
+
+    .kop-surat .teks {
+      flex: 1;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .kop-surat h2 {
+      margin: 0;
+      font-weight: bold;
+    }
+
+    .kop-surat h2.arabic {
+      font-family: "Traditional Arabic", serif;
+      font-size: 22px;
+    }
+
+    .kop-surat h2.latin {
+      font-size: 20px;
+    }
+
+    .kop-surat p {
+      margin: 0;
+      font-size: 13px;
+    }
+
+    .judul-surat {
+      text-align: center;
+      font-weight: bold;
+      text-decoration: underline;
+      margin: 25px 0 5px 0;
+      font-size: 18px;
+    }
+
+    .nomor-surat {
+      text-align: center;
+      margin-bottom: 25px;
+      font-size: 14px;
+    }
+
+    .isi-surat {
+      text-align: justify;
+      line-height: 1.8;
+      font-size: 15px;
+    }
+
+    .ttd-barcode-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 50px;
+  gap: 40px; /* jarak antar elemen */
+}
+
+.tanda-tangan, .barcode {
+  margin: 0;
+}
+
+.ttd-box {
+  text-align: center;
+  width: 280px;
+}
+
+.ttd-box img {
+  width: 110px;
+  height: auto;
+  margin-top: 5px;
+  margin-bottom: 5px;
+}
+
+.barcode {
+  font-size: 12px;
+  width: 280px;
+}
+
+.barcode img {
+  width: 120px;
+  height: auto;
+  display: block;
+  margin-top: 5px;
+}
+
+@media print {
+  body {
+    margin: 20mm;
+  }
+  .barcode img, .ttd-box img {
+    filter: grayscale(100%);
+  }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- KOP SURAT -->
+  <div class="kop-surat">
+    <div class="logo-kiri">
+      <img src="img/Logo Ar-Rahman.png" alt="Logo Ar-Rahman">
+    </div>
+    <div class="teks">
+      <h2 class="arabic">" معهد التربية الإسلامية الرحمن لتحفيظ القران والتكنولوجيا "</h2>
+      <h2 class="latin">PESANTREN TAHFIDZ QUR’AN & DIGITAL AR-RAHMAN</h2>
+      <p>Ruko Neka Green Blok C8 – C9 Jl. Raya Kalimalang, Kel. Jatimulya,<br>
+      Kec. Tambun Selatan, Kab. Bekasi – Jawa Barat 17510<br>
+      Telp. 0812-8361-2352 | Email: <span style="color:blue;">info@arrahman.id</span></p>
+    </div>
+  </div>
+
+  <!-- JUDUL SURAT -->
+  <div class="judul-surat">SURAT KETERANGAN SANTRI</div>
+  <div class="nomor-surat">Nomor: 012/AR-RAHMAN/X/2025</div>
+
+  <!-- ISI SURAT -->
+  <div class="isi-surat">
+    <p>Yang bertanda tangan di bawah ini, pimpinan <strong>Pesantren Tahfidz Qur’an & Digital Ar-Rahman</strong>,
+    menerangkan bahwa:</p>
+
+    <table style="margin-left:30px; margin-top:5px; margin-bottom:10px; font-size:15px;">
+      <tr><td width="160">Nama</td><td>: Muhammad Yusuf Al-Fatih</td></tr>
+      <tr><td>NIS</td><td>: 2025-001</td></tr>
+      <tr><td>Tempat, Tanggal Lahir</td><td>: Bekasi, 5 Januari 2010</td></tr>
+      <tr><td>Kelas / Jenjang</td><td>: 2 SMA / Tahfidz Reguler</td></tr>
+    </table>
+
+    <p>Benar bahwa santri tersebut di atas adalah siswa aktif di lingkungan
+    <strong>Pesantren Tahfidz Qur’an & Digital Ar-Rahman</strong> dan sedang menempuh pendidikan tahun ajaran
+    2025/2026.</p>
+
+    <p>Demikian surat keterangan ini dibuat dengan sebenarnya untuk dipergunakan sebagaimana mestinya.</p>
+  </div>
+
+  <!-- TANDA TANGAN & BARCODE -->
+<div class="ttd-barcode-container">
+  <!-- BARCODE -->
+  <div class="barcode">
+    <p>Kode Verifikasi Dokumen:</p>
+    <img src="img/barcode-example.png" alt="Barcode">
+    <p>ID Dokumen: AR-2025-0012</p>
+  </div>
+
+  <!-- TANDA TANGAN -->
+  <div class="tanda-tangan">
+    <div class="ttd-box">
+      <p>Bekasi, 31 Oktober 2025<br>
+      Pimpinan Pesantren,<br><br></p>
+      <img src="img/ttd-pimpinan.png" alt="Tanda Tangan">
+      <p><strong>Ust. Ahmad Ridwan, Lc.</strong><br>
+      NIP: 123456789</p>
+    </div>
+  </div>
+
+</div>
+
+
+</body>
+</html>

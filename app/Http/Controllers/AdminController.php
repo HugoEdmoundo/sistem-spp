@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 
 class AdminController extends Controller
@@ -257,10 +258,11 @@ class AdminController extends Controller
     // Di method pembayaranIndex
     public function pembayaranIndex()
     {
-        $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
-            ->pending()
+        // Pastikan menggunakan paginate(), bukan get()
+        $pembayaran = Pembayaran::with(['user', 'tagihan'])
+            ->where('status', 'pending')
             ->latest()
-            ->get();
+            ->paginate(20); // <- PASTIKAN INI paginate() BUKAN get()
 
         return view('admin.pembayaran.index', compact('pembayaran'));
     }
@@ -268,10 +270,29 @@ class AdminController extends Controller
     // Di method pembayaranHistory
     public function pembayaranHistory()
     {
-        $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])
-            ->whereIn('status', ['accepted', 'rejected'])
-            ->latest()
-            ->paginate(20);
+        $query = Pembayaran::with(['user', 'tagihan', 'admin'])
+            ->whereIn('status', ['accepted', 'rejected']);
+
+        // Filter status
+        if (request('status')) {
+            $query->where('status', request('status'));
+        }
+
+        // Filter metode
+        if (request('metode')) {
+            $query->where('metode', request('metode'));
+        }
+
+        // Filter search
+        if (request('search')) {
+            $search = request('search');
+            $query->whereHas('user', function($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        $pembayaran = $query->latest()->paginate(20);
 
         // Hitung jumlah pembayaran pending
         $pembayaranPending = Pembayaran::where('status', 'pending')->count();
@@ -364,11 +385,47 @@ class AdminController extends Controller
 
         return back()->with('success', 'Pembayaran berhasil disetujui.');
     }
+
     // Detail pembayaran
     public function showPembayaran($id)
     {
         $pembayaran = Pembayaran::with(['user', 'tagihan', 'admin'])->findOrFail($id);
         return view('admin.pembayaran.show', compact('pembayaran'));
+    }
+
+    public function generateKuitansi($pembayaranId)
+    {
+        try {
+            $pembayaran = Pembayaran::with(['user', 'admin', 'tagihan'])
+                ->findOrFail($pembayaranId);
+
+            // Admin bisa akses semua kuitansi, tidak perlu cek user_id seperti di murid
+
+            $data = [
+                'pembayaran' => $pembayaran,
+                'tanggal_sekarang' => now()->format('d F Y'),
+                'jam_sekarang' => now()->format('H:i:s'),
+            ];
+
+            $pdf = Pdf::loadView('admin.kuitansi-pdf', $data)
+                ->setPaper('a4', 'portrait')
+                ->setOptions([
+                    'defaultFont' => 'Times New Roman',
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                    'chroot' => public_path(),
+                    'dpi' => 150
+                ]);
+            
+            $filename = 'Kuitansi-' . $pembayaran->user->nama . '-' . now()->format('Y-m-d') . '.pdf';
+            
+            return $pdf->download($filename);
+
+        } catch (\Exception $e) {
+            \Log::error('Error generating kuitansi admin: ' . $e->getMessage());
+            return redirect()->route('admin.pembayaran.history')
+                ->with('error', '❌ Gagal generate kuitansi: ' . $e->getMessage());
+        }
     }
 
     // ==================== SPP SETTING ====================
