@@ -26,7 +26,7 @@
                     <input type="text" name="username" class="form-control" value="{{ $murid->username }}" required>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label>NIP (Opsional)</label>
+                    <label>NIS (Opsional)</label>
                     <input type="text" name="nip" class="form-control" value="{{ $murid->nip }}">
                 </div>
             </div>

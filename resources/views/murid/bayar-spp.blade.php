@@ -1,3 +1,4 @@
+<!-- resources/views/murid/bayar-spp.blade.php -->
 @extends('layouts.app')
 
 @section('title', 'Bayar SPP')
@@ -6,7 +7,7 @@
 <div class="row">
     <div class="col-12">
         <div class="page-title-box d-sm-flex align-items-center justify-content-between">
-            <h4 class="mb-sm-0">Bayar SPP</h4>
+            <h4 class="mb-sm-1">Bayar SPP</h4>
             <div class="page-title-right">
                 <ol class="breadcrumb m-0">
                     <li class="breadcrumb-item"><a href="{{ route('murid.dashboard') }}">Dashboard</a></li>
@@ -17,44 +18,26 @@
     </div>
 </div>
 
-{{-- resources/views/murid/bayar-spp.blade.php --}}
-@if($errors->any())
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <strong>❌ Terjadi Kesalahan:</strong>
-        <ul class="mb-0">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-@endif
-
-@if(session('error'))
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        <strong>Gagal:</strong> {{ session('error') }}
+@if(session('warning'))
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <strong>⚠️ Peringatan:</strong> {{ session('warning') }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
 @endif
 
 @if(session('success'))
     <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <strong>✅ Berhasil:</strong> {{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        <i class="bi bi-check-circle me-2"></i>
+        {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 @endif
 
-@if(session('info'))
-    <div class="alert alert-info alert-dismissible fade show" role="alert">
-        <strong>Informasi:</strong> {{ session('info') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-@endif
-
-@if(session('warning'))
-    <div class="alert alert-warning alert-dismissible fade show" role="alert">
-        <strong>⚠️ Peringatan:</strong> {{ session('warning') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Terdapat kesalahan dalam pengisian form. Silakan periksa kembali.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 @endif
 
@@ -65,22 +48,6 @@
                 <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Form Pembayaran SPP</h5>
             </div>
             <div class="card-body">
-                @if(session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle me-2"></i>
-                        {{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                @endif
-
-                @if($errors->any())
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-triangle me-2"></i>
-                        Terdapat kesalahan dalam pengisian form. Silakan periksa kembali.
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                @endif
-
                 <form method="POST" action="{{ route('murid.bayar.spp') }}" enctype="multipart/form-data" id="formBayarSpp">
                     @csrf
                     
@@ -119,7 +86,7 @@
                             <label class="form-label">Tahun *</label>
                             <select name="tahun" class="form-control @error('tahun') is-invalid @enderror" id="tahunSelect" required>
                                 <option value="">Pilih Tahun</option>
-                                @for($i = date('Y'); $i <= date('Y') + 1; $i++)
+                                @for($i = 2024; $i <= 2030; $i++)
                                 <option value="{{ $i }}" {{ old('tahun') == $i ? 'selected' : '' }}>
                                     {{ $i }}
                                 </option>
@@ -151,9 +118,6 @@
                             <input type="number" name="jumlah" class="form-control @error('jumlah') is-invalid @enderror" 
                                 id="jumlahBayar" min="0" value="{{ old('jumlah') }}" required>
                             <small class="text-muted">Masukkan jumlah yang dibayar</small>
-                            <div id="errorJumlah" class="text-danger small mt-1" style="display: none;">
-                                Jumlah bayar kurang dari total yang harus dibayar!
-                            </div>
                             @error('jumlah')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -190,10 +154,9 @@
                         </div>
                     </div>
 
-                    <!-- Alert untuk jumlah bayar kurang -->
-                    <div class="alert alert-warning" id="alertKurangBayar" style="display: none;">
+                    <div class="alert alert-warning" id="alertValidation" style="display: none;">
                         <i class="bi bi-exclamation-triangle me-2"></i>
-                        <strong>Peringatan:</strong> Jumlah bayar kurang dari total yang harus dibayar. Pastikan Anda membayar sesuai nominal.
+                        <span id="alertMessage"></span>
                     </div>
 
                     <div class="alert alert-info">
@@ -244,21 +207,20 @@
             </div>
         </div>
 
-        <!-- Info Rekening Sekolah -->
         <div class="material-card mt-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-bank me-2"></i>Rekening Sekolah</h5>
+                <h5 class="mb-0"><i class="bi bi-bank me-2"></i>Rekening Transfer</h5>
             </div>
             <div class="card-body">
                 <div class="mb-2">
                     <small class="text-muted">Bank BCA</small>
                     <div class="fw-bold">123-456-7890</div>
-                    <div class="small">a.n. SMP NEGERI 1 CONTOH</div>
+                    {{-- <div class="small">a.n. SMP NEGERI 1 CONTOH</div> --}}
                 </div>
                 <div class="mb-2">
                     <small class="text-muted">Bank Mandiri</small>
                     <div class="fw-bold">098-765-4321</div>
-                    <div class="small">a.n. SMP NEGERI 1 CONTOH</div>
+                    {{-- <div class="small">a.n. SMP NEGERI 1 CONTOH</div> --}}
                 </div>
             </div>
         </div>
@@ -274,19 +236,39 @@ document.addEventListener('DOMContentLoaded', function() {
     const totalHarusBayar = document.getElementById('totalHarusBayar');
     const jumlahBayar = document.getElementById('jumlahBayar');
     const keteranganOtomatis = document.getElementById('keteranganOtomatis');
-    const errorJumlah = document.getElementById('errorJumlah');
-    const alertKurangBayar = document.getElementById('alertKurangBayar');
+    const alertValidation = document.getElementById('alertValidation');
+    const alertMessage = document.getElementById('alertMessage');
     const submitBtn = document.getElementById('submitBtn');
     const formBayarSpp = document.getElementById('formBayarSpp');
     const nominalSpp = {{ $nominalSpp }};
 
     let totalYangHarusDibayar = 0;
 
+    function showAlert(message, type = 'warning') {
+        alertMessage.textContent = message;
+        alertValidation.className = `alert alert-${type} alert-dismissible fade show`;
+        alertValidation.style.display = 'block';
+    }
+
+    function hideAlert() {
+        alertValidation.style.display = 'none';
+    }
+
     function updatePerhitungan() {
         const mulai = parseInt(bulanMulai.value);
         const akhir = parseInt(bulanAkhir.value);
+        const tahun = parseInt(tahunSelect.value);
         
-        if (mulai && akhir && mulai <= akhir) {
+        hideAlert();
+
+        // Validasi bulan
+        if (mulai && akhir && mulai > akhir) {
+            showAlert('❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!', 'danger');
+            resetPerhitungan();
+            return;
+        }
+
+        if (mulai && akhir && tahun) {
             const jumlah = (akhir - mulai) + 1;
             totalYangHarusDibayar = jumlah * nominalSpp;
             
@@ -296,7 +278,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Update keterangan otomatis
             const bulanMulaiNama = new Date(2000, mulai - 1).toLocaleString('id-ID', { month: 'long' });
             const bulanAkhirNama = new Date(2000, akhir - 1).toLocaleString('id-ID', { month: 'long' });
-            const tahun = tahunSelect.value;
             
             if (jumlah === 1) {
                 keteranganOtomatis.value = `Bayar SPP Bulan ${bulanMulaiNama} ${tahun}`;
@@ -309,15 +290,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 jumlahBayar.value = totalYangHarusDibayar;
             }
 
-            // Validasi jumlah bayar
             validateJumlahBayar();
         } else {
-            jumlahBulan.value = '';
-            totalHarusBayar.value = '';
-            keteranganOtomatis.value = '';
-            totalYangHarusDibayar = 0;
-            hideAlerts();
+            resetPerhitungan();
         }
+    }
+
+    function resetPerhitungan() {
+        jumlahBulan.value = '';
+        totalHarusBayar.value = '';
+        keteranganOtomatis.value = '';
+        totalYangHarusDibayar = 0;
+        hideAlert();
+        enableSubmitButton();
     }
 
     function validateJumlahBayar() {
@@ -325,43 +310,50 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (totalYangHarusDibayar > 0) {
             if (jumlahBayarValue < totalYangHarusDibayar) {
-                // Tampilkan error dan alert
-                errorJumlah.style.display = 'block';
-                alertKurangBayar.style.display = 'block';
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Jumlah Bayar Kurang';
+                showAlert('⚠️ Jumlah bayar kurang dari total yang harus dibayar! Pastikan Anda membayar sesuai nominal.');
+                disableSubmitButton();
                 return false;
             } else {
-                // Sembunyikan error dan alert
-                hideAlerts();
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Upload Bukti Bayar';
+                hideAlert();
+                enableSubmitButton();
                 return true;
             }
         }
         return true;
     }
 
-    function hideAlerts() {
-        errorJumlah.style.display = 'none';
-        alertKurangBayar.style.display = 'none';
+    function disableSubmitButton() {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-x-circle me-2"></i>Jumlah Bayar Kurang';
+    }
+
+    function enableSubmitButton() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Upload Bukti Bayar';
     }
 
     // Event listeners
     bulanMulai.addEventListener('change', updatePerhitungan);
     bulanAkhir.addEventListener('change', updatePerhitungan);
     tahunSelect.addEventListener('change', updatePerhitungan);
-    
-    // Validasi real-time saat input jumlah bayar berubah
-    jumlahBayar.addEventListener('input', function() {
-        validateJumlahBayar();
-    });
+    jumlahBayar.addEventListener('input', validateJumlahBayar);
 
     // Validasi sebelum form submit
     formBayarSpp.addEventListener('submit', function(e) {
+        const mulai = parseInt(bulanMulai.value);
+        const akhir = parseInt(bulanAkhir.value);
+        
+        // Validasi bulan
+        if (mulai > akhir) {
+            e.preventDefault();
+            showAlert('❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!', 'danger');
+            return;
+        }
+        
+        // Validasi jumlah bayar
         if (!validateJumlahBayar()) {
             e.preventDefault();
-            alert('Jumlah bayar kurang dari total yang harus dibayar. Silakan periksa kembali.');
+            return;
         }
     });
 
@@ -369,51 +361,4 @@ document.addEventListener('DOMContentLoaded', function() {
     updatePerhitungan();
 });
 </script>
-{{-- Tambahkan di file blade --}}
-<script>
-// Validasi real-time sebelum submit
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('form');
-    if (form) {
-        form.addEventListener('submit', function(e) {
-            const bulanMulai = parseInt(document.getElementById('bulan_mulai').value);
-            const bulanAkhir = parseInt(document.getElementById('bulan_akhir').value);
-            const tahun = parseInt(document.getElementById('tahun').value);
-            
-            // Validasi bulan
-            if (bulanMulai > bulanAkhir) {
-                e.preventDefault();
-                showAlert('❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!', 'danger');
-                return;
-            }
-            
-            // Validasi tahun
-            const currentYear = new Date().getFullYear();
-            if (tahun < currentYear - 1 || tahun > currentYear + 1) {
-                e.preventDefault();
-                showAlert('❌ Tahun harus antara ' + (currentYear - 1) + ' dan ' + (currentYear + 1) + '!', 'danger');
-                return;
-            }
-        });
-    }
-    
-    // Fungsi untuk show alert
-    function showAlert(message, type) {
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
-        alertDiv.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        
-        document.querySelector('.container').prepend(alertDiv);
-        
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            alertDiv.remove();
-        }, 5000);
-    }
-});
-</script>
-
 @endsection

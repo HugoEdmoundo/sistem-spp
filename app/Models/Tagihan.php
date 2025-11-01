@@ -13,8 +13,6 @@ class Tagihan extends Model
         'user_id',
         'jenis',
         'keterangan',
-        'bulan',
-        'tahun',
         'jumlah',
         'status'
     ];

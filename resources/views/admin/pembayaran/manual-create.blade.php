@@ -1,3 +1,4 @@
+
 @extends('layouts.app')
 
 @section('title', 'Buat Pembayaran Manual')
@@ -80,13 +81,16 @@
                                     @endfor
                                 </select>
                             </div>
+                            <!-- GANTI BAGIAN TAHUN SELECT DENGAN INI: -->
                             <div class="col-md-4">
                                 <label for="tahun" class="form-label">Tahun <span class="text-danger">*</span></label>
                                 <select name="tahun" class="form-select" id="tahun" required>
                                     <option value="">Pilih Tahun</option>
-                                    @for($i = date('Y'); $i >= date('Y')-2; $i--)
-                                        <option value="{{ $i }}">{{ $i }}</option>
-                                    @endfor
+                                    @foreach($tahunUntukSelect as $tahunItem)
+                                        <option value="{{ $tahunItem }}" {{ $tahunItem == date('Y') ? 'selected' : '' }}>
+                                            {{ $tahunItem }}
+                                        </option>
+                                    @endforeach
                                 </select>
                             </div>
                         </div>

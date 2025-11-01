@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Mail;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Traits\TahunTrait; // ← ADD THIS
 
 class MuridController extends Controller
 {
+    use TahunTrait; // ← ADD THIS
     public function dashboard()
     {   
         $user = auth()->user();
@@ -79,37 +81,26 @@ class MuridController extends Controller
         ]);
     }
 
+
     // METHOD REKAP SPP YANG DIPERLUKAN
     public function rekapSppSaya()
     {
         $user = auth()->user();
-        $tahun = request('tahun', date('Y'));
+        $tahun = request('tahun', $this->getTahunSekarang());
+        
+        // GUNAKAN TRAIT METHOD
+        $tahunTersedia = $this->getTahunTersedia($user->id);
         
         $statusSpp = $user->getStatusSppTahunan($tahun);
-        
-        // Ambil semua tahun yang ada pembayaran SPP
-        $tahunTersedia = Pembayaran::where('user_id', $user->id)
-            ->whereNull('tagihan_id')
-            ->where('status', 'accepted')
-            ->distinct()
-            ->pluck('tahun')
-            ->toArray();
-            
-        // Tambahkan tahun saat ini jika belum ada
-        if (!in_array(date('Y'), $tahunTersedia)) {
-            $tahunTersedia[] = date('Y');
-        }
-        
-        sort($tahunTersedia);
 
-        return view('murid.rekap-spp', [
-            'statusSpp' => $statusSpp,
-            'tahun' => $tahun,
-            'tahunTersedia' => $tahunTersedia,
-            'user' => $user
-        ]);
+        return view('murid.rekap-spp', compact(
+            'statusSpp',
+            'tahun',
+            'tahunTersedia',
+            'user'
+        ));
     }
-
+    
     // METHOD GENERATE KUITANSI YANG DIPERLUKAN
     public function generateKuitansi($pembayaranId)
 {
@@ -227,10 +218,18 @@ class MuridController extends Controller
         $sppSetting = SppSetting::latest()->first();
         $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
         
-        $tahun = date('Y');
+        $tahun = $this->getTahunSekarang();
         $bulanSekarang = date('n');
+        
+        // TAMBAHKAN TAHUN UNTUK SELECT
+        $tahunUntukSelect = $this->getTahunUntukSelect(2024, 2030);
 
-        return view('murid.bayar-spp', compact('nominalSpp', 'tahun', 'bulanSekarang'));
+        return view('murid.bayar-spp', compact(
+            'nominalSpp', 
+            'tahun', 
+            'bulanSekarang',
+            'tahunUntukSelect' // ← ADD THIS
+        ));
     }
 
 

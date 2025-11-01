@@ -21,10 +21,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Traits\TahunTrait; // ← ADD THIS
 
 
 class AdminController extends Controller
 {
+    use TahunTrait;
     public function dashboard()
     {
         $totalMurid = User::where('role', 'murid')->where('aktif', true)->count();
@@ -137,24 +139,27 @@ class AdminController extends Controller
     public function tagihanCreate()
     {
         $murid = User::where('role', 'murid')->where('aktif', true)->get();
-        return view('admin.tagihan.create', compact('murid'));
+        
+        // TAMBAHKAN TAHUN UNTUK SELECT
+        $tahunUntukSelect = $this->getTahunUntukSelect(2024, 2030);
+        
+        return view('admin.tagihan.create', compact('murid', 'tahunUntukSelect'));
     }
     
+    // Di Controller
     public function tagihanStore(Request $request)
     {
         $request->validate([
             'user_id' => 'required',
-            'jenis' => 'required',
             'keterangan' => 'required',
             'jumlah' => 'required|numeric|min:0'
+            // Hapus validasi untuk 'jenis'
         ]);
 
         Tagihan::create([
             'user_id' => $request->user_id,
-            'jenis' => $request->jenis,
+            'jenis' => 'custom', // Set otomatis sebagai custom
             'keterangan' => $request->keterangan,
-            'bulan' => $request->bulan,
-            'tahun' => $request->tahun,
             'jumlah' => $request->jumlah,
             'status' => 'unpaid'
         ]);
@@ -488,11 +493,18 @@ class AdminController extends Controller
         $murid = User::where('role', 'murid')->where('aktif', true)->get();
         $tagihan = Tagihan::where('status', 'unpaid')->get();
         
-        // Ambil nominal SPP dari settings
         $sppSetting = SppSetting::orderBy('berlaku_mulai', 'desc')->first();
         $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
         
-        return view('admin.pembayaran.manual-create', compact('murid', 'tagihan', 'nominalSpp'));
+        // TAMBAHKAN INI UNTUK PASS TAHUN KE VIEW
+        $tahunUntukSelect = $this->getTahunUntukSelect(2024, 2030);
+        
+        return view('admin.pembayaran.manual-create', compact(
+            'murid', 
+            'tagihan', 
+            'nominalSpp',
+            'tahunUntukSelect' // ← ADD THIS
+        ));
     }
     
     // Di AdminController.php - Method pembayaranManualStore
@@ -652,12 +664,49 @@ class AdminController extends Controller
     
     // ==================== MURID PEMBAYARAN ====================
 
-    public function muridPembayaran($id)
+   public function muridPembayaran($id)
     {
         $murid = User::where('role', 'murid')->findOrFail($id);
         $tahun = request('tahun', date('Y'));
         
-        // Ambil semua pembayaran murid
+        // Debug: Lihat data pembayaran yang ada
+        $allPembayaran = Pembayaran::where('user_id', $id)->get();
+        
+        // Ambil tahun-tahun yang tersedia dari berbagai sumber
+        $tahunDariPembayaran = Pembayaran::where('user_id', $id)
+            ->whereNotNull('tahun')
+            ->distinct()
+            ->pluck('tahun')
+            ->toArray();
+
+        $tahunDariTanggal = Pembayaran::where('user_id', $id)
+            ->selectRaw('YEAR(tanggal_upload) as tahun')
+            ->distinct()
+            ->pluck('tahun')
+            ->toArray();
+
+        $tahunDariTagihan = Tagihan::where('user_id', $id)
+            ->whereNotNull('tahun')
+            ->distinct()
+            ->pluck('tahun')
+            ->toArray();
+
+        // Gabungkan semua tahun yang mungkin
+        $tahunTersedia = array_unique(array_merge(
+            $tahunDariPembayaran,
+            $tahunDariTanggal,
+            $tahunDariTagihan
+        ));
+
+        // Jika tidak ada data, tambahkan tahun saat ini dan sebelumnya
+        if (empty($tahunTersedia)) {
+            $tahunTersedia = [date('Y'), date('Y') - 1];
+        }
+
+        // Urutkan tahun descending (terbaru dulu)
+        rsort($tahunTersedia);
+
+        // Ambil semua pembayaran murid untuk riwayat
         $pembayaran = Pembayaran::where('user_id', $id)
             ->with(['admin', 'tagihan'])
             ->latest()
@@ -666,8 +715,14 @@ class AdminController extends Controller
         // Gunakan method yang sudah diperbaiki
         $statusSpp = $murid->getStatusSppTahunan($tahun);
         
-        // Hitung total yang sudah dibayar (hanya yang accepted)
-        $totalDibayar = $pembayaran->where('status', 'accepted')->sum('jumlah');
+        // Hitung total yang sudah dibayar untuk tahun yang dipilih
+        $totalDibayar = Pembayaran::where('user_id', $id)
+            ->where('status', 'accepted')
+            ->where(function($query) use ($tahun) {
+                $query->where('tahun', $tahun)
+                    ->orWhereYear('tanggal_upload', $tahun);
+            })
+            ->sum('jumlah');
         
         // Hitung pembayaran pending untuk badge
         $pembayaranPendingCount = Pembayaran::where('status', 'pending')->count();
@@ -677,6 +732,7 @@ class AdminController extends Controller
             'pembayaran',
             'statusSpp',
             'tahun',
+            'tahunTersedia',
             'totalDibayar',
             'pembayaranPendingCount'
         ));

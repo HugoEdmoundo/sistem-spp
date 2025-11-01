@@ -6,56 +6,34 @@
 @section('content')
 <div class="card">
     <div class="card-header">
-        <h5>Tambah Tagihan Custom</h5>
+        <h5>Tambah Tagihan</h5>
     </div>
     <div class="card-body">
         <form method="POST" action="{{ route('admin.tagihan.store') }}">
             @csrf
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label>Murid</label>
+                    <label class="form-label">Murid <span class="text-danger">*</span></label>
                     <select name="user_id" class="form-control" required>
                         <option value="">Pilih Murid</option>
                         @foreach($murid as $item)
-                        <option value="{{ $item->id }}">{{ $item->nama }} ({{ $item->email }})</option>
+                        <option value="{{ $item->id }}">{{ $item->nama }} ({{ $item->username }})</option>
                         @endforeach
                     </select>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label>Jenis Tagihan</label>
-                    <select name="jenis" class="form-control" required>
-                        <option value="custom">Custom</option>
-                    </select>
+                    <label class="form-label">Jumlah <span class="text-danger">*</span></label>
+                    <input type="number" name="jumlah" class="form-control" min="0" placeholder="0" required>
                 </div>
-                <div class="col-md-12 mb-3">
-                    <label>Keterangan</label>
+                <div class="col-12 mb-3">
+                    <label class="form-label">Keterangan <span class="text-danger">*</span></label>
                     <input type="text" name="keterangan" class="form-control" placeholder="Contoh: Denda, Seragam, Kegiatan, dll" required>
                 </div>
-                <div class="col-md-6 mb-3">
-                    <label>Bulan (Opsional untuk SPP)</label>
-                    <select name="bulan" class="form-control">
-                        <option value="">Pilih Bulan</option>
-                        @for($i = 1; $i <= 12; $i++)
-                        <option value="{{ $i }}">{{ DateTime::createFromFormat('!m', $i)->format('F') }}</option>
-                        @endfor
-                    </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label>Tahun (Opsional untuk SPP)</label>
-                    <select name="tahun" class="form-control">
-                        <option value="">Pilih Tahun</option>
-                        @for($i = date('Y'); $i >= date('Y') - 5; $i--)
-                        <option value="{{ $i }}">{{ $i }}</option>
-                        @endfor
-                    </select>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label>Jumlah</label>
-                    <input type="number" name="jumlah" class="form-control" min="0" required>
-                </div>
             </div>
-            <button type="submit" class="btn btn-primary">Simpan</button>
-            <a href="{{ route('admin.tagihan.index') }}" class="btn btn-secondary">Batal</a>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Simpan Tagihan</button>
+                <a href="{{ route('admin.tagihan.index') }}" class="btn btn-secondary">Batal</a>
+            </div>
         </form>
     </div>
 </div>
