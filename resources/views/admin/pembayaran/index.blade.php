@@ -145,17 +145,23 @@
                                             <h5 class="modal-title">Tolak Pembayaran</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
+                                        <!-- Di dalam modal tolak -->
                                         <form action="{{ route('admin.pembayaran.reject', $item->id) }}" method="POST">
                                             @csrf
+                                            @method('POST') <!-- Tambahkan ini -->
                                             <div class="modal-body">
                                                 <p class="mb-3">Tolak pembayaran dari <strong>{{ $item->user->nama }}</strong>?</p>
                                                 <div class="mb-3">
                                                     <label for="alasan_reject{{ $item->id }}" class="form-label">
-                                                        <strong>Alasan Penolakan</strong>
+                                                        <strong>Alasan Penolakan <span class="text-danger">*</span></strong>
                                                     </label>
                                                     <textarea class="form-control" id="alasan_reject{{ $item->id }}" 
-                                                              name="alasan_reject" rows="3" required 
-                                                              placeholder="Berikan alasan penolakan..."></textarea>
+                                                            name="alasan_reject" rows="3" required 
+                                                            minlength="5" maxlength="500"
+                                                            placeholder="Berikan alasan penolakan yang jelas...">{{ old('alasan_reject') }}</textarea>
+                                                    @error('alasan_reject')
+                                                        <div class="text-danger small mt-1">{{ $message }}</div>
+                                                    @enderror
                                                 </div>
                                             </div>
                                             <div class="modal-footer">

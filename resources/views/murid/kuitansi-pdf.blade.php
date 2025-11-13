@@ -1,3 +1,4 @@
+<!-- resources/views/murid/kuitansi-pdf.blade.php -->
 <!DOCTYPE html>
 <html lang="id">
 <head>

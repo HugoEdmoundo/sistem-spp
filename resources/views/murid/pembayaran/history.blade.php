@@ -13,7 +13,20 @@
             </div>
             <div>
                 <h4 class="mb-0 fw-bold">Riwayat Pembayaran Saya</h4>
-                <p class="text-muted mb-0">Daftar semua pembayaran yang telah Anda lakukan</p>
+                <p class="text-muted mb-0">Daftar semua pembayaran yang telah dilakukan</p>
+            </div>
+        </div>
+        <a href="{{ route('murid.tagihan.index') }}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left me-2"></i>Kembali ke Tagihan
+        </a>
+    </div>
+    <!-- Bisa tambahkan di bagian atas view history jika perlu -->
+    <div class="alert alert-info mb-4">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-info-circle-fill me-3 fs-4"></i>
+            <div>
+                <strong>Informasi:</strong> Untuk melanjutkan pembayaran cicilan, silakan buka menu 
+                <a href="{{ route('murid.tagihan.index') }}" class="alert-link">Tagihan Saya</a>.
             </div>
         </div>
     </div>
@@ -41,11 +54,11 @@
                     <thead class="table-light">
                         <tr>
                             <th scope="col" class="ps-4">#</th>
+                            <th scope="col">Jenis</th>
                             <th scope="col">Keterangan</th>
                             <th scope="col">Metode</th>
                             <th scope="col">Jumlah</th>
                             <th scope="col">Status</th>
-                            <th scope="col">Bukti</th>
                             <th scope="col">Tanggal</th>
                             <th scope="col" class="text-center pe-4">Aksi</th>
                         </tr>
@@ -55,6 +68,26 @@
                         <tr class="align-middle">
                             <td class="ps-4 fw-semibold">{{ $index + 1 }}</td>
                             
+                            <!-- Jenis Column -->
+                            <td>
+                                @if($item->tagihan_id)
+                                    @if($item->tagihan->jenis == 'spp')
+                                        <span class="badge bg-info">SPP</span>
+                                    @else
+                                        <span class="badge bg-primary">Tagihan</span>
+                                    @endif
+                                @else
+                                    <span class="badge bg-secondary">Lainnya</span>
+                                @endif
+                                
+                                <!-- Jenis Bayar -->
+                                @if($item->isLunas())
+                                    <span class="badge bg-success mt-1">Lunas</span>
+                                @elseif($item->isCicilan())
+                                    <span class="badge bg-warning mt-1">Cicilan</span>
+                                @endif
+                            </td>
+                            
                             <!-- Keterangan Column -->
                             <td>
                                 <div class="d-flex flex-column">
@@ -62,24 +95,14 @@
                                         @if($item->tagihan)
                                             {{ $item->tagihan->keterangan }}
                                         @else
-                                            {{ $item->keterangan ?? 'Pembayaran SPP Fleksibel' }}
+                                            {{ $item->keterangan ?? 'Pembayaran' }}
                                         @endif
                                     </span>
                                     
-                                    <!-- Badge Jenis Pembayaran -->
-                                    <div class="mt-1">
-                                        @if($item->tagihan)
-                                            <span class="badge bg-primary">Tagihan</span>
-                                        @else
-                                            <span class="badge bg-info">Fleksibel</span>
-                                        @endif
-                                    </div>
-                                    
-                                    <!-- Periode untuk SPP Fleksibel -->
-                                    @if(!$item->tagihan && $item->bulan_mulai && $item->bulan_akhir)
-                                        <small class="text-muted mt-1">
-                                            Periode: {{ \App\Models\User::getNamaBulanStatic($item->bulan_mulai) }} - 
-                                            {{ \App\Models\User::getNamaBulanStatic($item->bulan_akhir) }} {{ $item->tahun }}
+                                    @if($item->tagihan && $item->tagihan->is_cicilan)
+                                        <small class="text-info mt-1">
+                                            <i class="bi bi-arrow-repeat me-1"></i>
+                                            Progress: {{ number_format($item->tagihan->persentase_dibayar, 1) }}%
                                         </small>
                                     @endif
                                     
@@ -109,29 +132,16 @@
                             <td>
                                 @if($item->status == 'pending')
                                     <span class="badge bg-warning">
-                                        <i class="bi bi-clock me-1"></i>Pending
+                                        <i class="bi bi-clock me-1"></i>Menunggu
                                     </span>
                                 @elseif($item->status == 'accepted')
                                     <span class="badge bg-success">
-                                        <i class="bi bi-check-circle me-1"></i>Accepted
+                                        <i class="bi bi-check-circle me-1"></i>Diterima
                                     </span>
                                 @else
                                     <span class="badge bg-danger">
-                                        <i class="bi bi-x-circle me-1"></i>Rejected
+                                        <i class="bi bi-x-circle me-1"></i>Ditolak
                                     </span>
-                                @endif
-                            </td>
-                            
-                            <!-- Bukti Column -->
-                            <td>
-                                @if($item->bukti)
-                                <a href="{{ asset('storage/' . $item->bukti) }}" 
-                                   target="_blank" 
-                                   class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-eye me-1"></i>Lihat
-                                </a>
-                                @else
-                                <span class="text-muted">-</span>
                                 @endif
                             </td>
                             
@@ -174,16 +184,15 @@
                                             <i class="bi bi-receipt"></i>
                                         </a>
                                     @endif
-                                    
-                                    <!-- Tombol Upload Ulang untuk yang rejected -->
-                                    @if($item->status == 'rejected')
-                                        <button type="button" 
-                                                class="btn btn-sm btn-outline-warning" 
-                                                data-bs-toggle="modal" 
-                                                data-bs-target="#uploadUlangModal{{ $item->id }}"
-                                                title="Upload Ulang Bukti">
-                                            <i class="bi bi-upload"></i>
-                                        </button>
+
+                                    <!-- Tombol Lihat Bukti -->
+                                    @if($item->bukti)
+                                        <a href="{{ asset('storage/' . $item->bukti) }}" 
+                                        class="btn btn-sm btn-outline-primary" 
+                                        title="Lihat Bukti"
+                                        target="_blank">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
                                     @endif
                                 </div>
                             </td>
@@ -215,9 +224,22 @@
                                                             <div class="col-5"><small class="text-muted">Jenis</small></div>
                                                             <div class="col-7">
                                                                 @if($item->tagihan_id)
-                                                                    <span class="badge bg-primary">Tagihan</span>
+                                                                    @if($item->tagihan->jenis == 'spp')
+                                                                        <span class="badge bg-info">SPP</span>
+                                                                    @else
+                                                                        <span class="badge bg-primary">Tagihan</span>
+                                                                    @endif
                                                                 @else
-                                                                    <span class="badge bg-info">SPP Fleksibel</span>
+                                                                    <span class="badge bg-secondary">Lainnya</span>
+                                                                @endif
+                                                            </div>
+                                                            
+                                                            <div class="col-5"><small class="text-muted">Jenis Bayar</small></div>
+                                                            <div class="col-7">
+                                                                @if($item->isLunas())
+                                                                    <span class="badge bg-success">Lunas</span>
+                                                                @else
+                                                                    <span class="badge bg-warning">Cicilan</span>
                                                                 @endif
                                                             </div>
                                                             
@@ -232,9 +254,6 @@
                                                                     <small class="text-muted">-</small>
                                                                 @endif
                                                             </div>
-                                                            
-                                                            <div class="col-5"><small class="text-muted">Metode</small></div>
-                                                            <div class="col-7"><small>{{ $item->metode }}</small></div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -249,35 +268,59 @@
                                                             <div class="col-5"><small class="text-muted">Status</small></div>
                                                             <div class="col-7">
                                                                 @if($item->status == 'pending')
-                                                                    <span class="badge bg-warning">Pending</span>
+                                                                    <span class="badge bg-warning">Menunggu</span>
                                                                 @elseif($item->status == 'accepted')
-                                                                    <span class="badge bg-success">Accepted</span>
+                                                                    <span class="badge bg-success">Diterima</span>
                                                                 @else
-                                                                    <span class="badge bg-danger">Rejected</span>
+                                                                    <span class="badge bg-danger">Ditolak</span>
                                                                 @endif
                                                             </div>
                                                             
                                                             <div class="col-5"><small class="text-muted">Jumlah</small></div>
                                                             <div class="col-7">
                                                                 <small class="fw-bold text-primary">
-                                                                    Rp {{ number_format($item->jumlah, 0, ',', '.') }}
+                                                                    {{ $item->jumlah_formatted }}
                                                                 </small>
                                                             </div>
                                                             
-                                                            @if($item->status == 'rejected' && $item->alasan_reject)
-                                                            <div class="col-12 mt-2">
-                                                                <small class="text-muted">Alasan Ditolak</small>
-                                                                <div class="text-danger small">
-                                                                    <i class="bi bi-exclamation-triangle me-1"></i> 
-                                                                    {{ $item->alasan_reject }}
-                                                                </div>
-                                                            </div>
-                                                            @endif
+                                                            <div class="col-5"><small class="text-muted">Metode</small></div>
+                                                            <div class="col-7"><small>{{ $item->metode }}</small></div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <!-- Info Tagihan -->
+                                        @if($item->tagihan)
+                                        <div class="mt-3">
+                                            <h6 class="border-bottom pb-2">
+                                                <i class="bi bi-receipt me-2"></i>Informasi Tagihan
+                                            </h6>
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <small class="text-muted">Total Tagihan</small>
+                                                    <div class="fw-bold">{{ $item->tagihan->jumlah_formatted }}</div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <small class="text-muted">Total Dibayar</small>
+                                                    <div class="fw-bold text-success">{{ $item->tagihan->total_dibayar_formatted }}</div>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <small class="text-muted">Sisa Tagihan</small>
+                                                    <div class="fw-bold text-warning">{{ $item->tagihan->sisa_tagihan_formatted }}</div>
+                                                </div>
+                                            </div>
+                                            @if($item->tagihan->is_cicilan)
+                                            <div class="mt-2">
+                                                <div class="progress" style="height: 8px;">
+                                                    <div class="progress-bar bg-success" style="width: {{ $item->tagihan->persentase_dibayar }}%"></div>
+                                                </div>
+                                                <small class="text-muted">{{ number_format($item->tagihan->persentase_dibayar, 1) }}% terbayar</small>
+                                            </div>
+                                            @endif
+                                        </div>
+                                        @endif
 
                                         @if($item->bukti)
                                         <div class="mt-3">
@@ -292,13 +335,24 @@
                                         </div>
                                         @endif
 
+                                        @if($item->status == 'rejected' && $item->alasan_reject)
+                                        <div class="mt-3 alert alert-danger">
+                                            <h6 class="alert-heading">
+                                                <i class="bi bi-exclamation-triangle me-2"></i>Alasan Penolakan
+                                            </h6>
+                                            <p class="mb-0">{{ $item->alasan_reject }}</p>
+                                        </div>
+                                        @endif
+
                                         @if($item->status == 'accepted')
-                                        <div class="mt-3 alert alert-success d-flex align-items-center">
-                                            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-                                            <div>
-                                                <strong>Pembayaran telah diverifikasi dan diterima.</strong>
-                                                <br>
-                                                <small>Kuitansi tersedia untuk diunduh.</small>
+                                        <div class="mt-3 alert alert-success">
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+                                                <div>
+                                                    <strong>Pembayaran telah diverifikasi dan diterima.</strong>
+                                                    <br>
+                                                    <small>Kuitansi tersedia untuk diunduh.</small>
+                                                </div>
                                             </div>
                                         </div>
                                         @endif
@@ -316,65 +370,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Modal Upload Ulang (Unified) -->
-                        @if($item->status == 'rejected')
-                        <div class="modal fade" id="uploadUlangModal{{ $item->id }}" tabindex="-1">
-                            <div class="modal-dialog">
-                                <div class="modal-content">
-                                    <div class="modal-header bg-light">
-                                        <h5 class="modal-title">
-                                            <i class="bi bi-upload me-2"></i>
-                                            Upload Ulang Bukti Pembayaran
-                                        </h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <form action="{{ $item->tagihan_id ? route('murid.pembayaran.upload-ulang', $item->id) : route('murid.spp.upload-ulang', $item->id) }}" 
-                                          method="POST" 
-                                          enctype="multipart/form-data">
-                                        @csrf
-                                        <div class="modal-body">
-                                            <div class="alert alert-warning">
-                                                <h6 class="alert-heading">
-                                                    <i class="bi bi-exclamation-triangle me-2"></i>Alasan Penolakan Sebelumnya
-                                                </h6>
-                                                <p class="mb-0">{{ $item->alasan_reject }}</p>
-                                            </div>
-                                            
-                                            <div class="mb-3">
-                                                <label for="metode{{ $item->id }}" class="form-label">Metode Pembayaran *</label>
-                                                <select class="form-select" id="metode{{ $item->id }}" name="metode" required>
-                                                    <option value="">Pilih Metode</option>
-                                                    <option value="Transfer">Transfer</option>
-                                                    <option value="Tunai">Tunai</option>
-                                                    <option value="QRIS">QRIS</option>
-                                                </select>
-                                            </div>
-
-                                            <div class="mb-3">
-                                                <label for="bukti{{ $item->id }}" class="form-label">Bukti Pembayaran Baru *</label>
-                                                <input type="file" class="form-control" id="bukti{{ $item->id }}" name="bukti" accept=".jpg,.jpeg,.png,.pdf" required>
-                                                <div class="form-text">Format: JPG, PNG, PDF (Maks. 2MB)</div>
-                                            </div>
-
-                                            @if(!$item->tagihan_id)
-                                            <div class="mb-3">
-                                                <label for="keterangan{{ $item->id }}" class="form-label">Keterangan *</label>
-                                                <input type="text" class="form-control" id="keterangan{{ $item->id }}" name="keterangan" value="Upload ulang pembayaran SPP" required>
-                                            </div>
-                                            @endif
-                                        </div>
-                                        <div class="modal-footer">
-                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                                            <button type="submit" class="btn btn-primary">
-                                                <i class="bi bi-upload me-1"></i>Upload Ulang
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
                         @empty
                         <tr>
                             <td colspan="8" class="text-center py-5">

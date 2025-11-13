@@ -1,46 +1,240 @@
+<!-- resources/views/murid/dashboard.blade.php -->
 @extends('layouts.app')
 
 @section('title', 'Dashboard Murid')
 
 @section('content')
-<div class="row mb-4">
-    <div class="col-md-3 mb-4">
-        <div class="stat-card warning">
-            <div class="stat-icon">
-                <i class="bi bi-file-invoice"></i>
+<!-- resources/views/murid/dashboard.blade.php -->
+<!-- Di bagian statistik -->
+
+<div class="row">
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-hover">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <span class="text-muted mb-1">Total Tagihan</span>
+                        <h4 class="mb-0">Rp {{ number_format($totalTagihan, 0, ',', '.') }}</h4>
+                        <small class="text-muted">
+                            {{ $tagihanUnpaidCount }} belum bayar + 
+                            {{ $tagihanPartialCount }} cicilan
+                        </small>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="avatar-sm">
+                            <span class="avatar-title bg-primary rounded-circle">
+                                <i class="bi bi-receipt fs-4"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-value">Rp {{ number_format($totalTagihan, 0, ',', '.') }}</div>
-            <div class="stat-label">Total Tagihan</div>
         </div>
     </div>
-    <div class="col-md-3 mb-4">
-        <div class="stat-card success">
-            <div class="stat-icon">
-                <i class="bi bi-check-circle"></i>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-hover">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <span class="text-muted mb-1">Total Dibayar</span>
+                        <h4 class="mb-0">Rp {{ number_format($totalDibayar, 0, ',', '.') }}</h4>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="avatar-sm">
+                            <span class="avatar-title bg-success rounded-circle">
+                                <i class="bi bi-cash-coin fs-4"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-value">Rp {{ number_format($totalDibayar, 0, ',', '.') }}</div>
-            <div class="stat-label">Total Dibayar</div>
         </div>
     </div>
-    <div class="col-md-3 mb-4">
-        <div class="stat-card info">
-            <div class="stat-icon">
-                <i class="bi bi-clock"></i>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-hover">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <span class="text-muted mb-1">Menunggu Verifikasi</span>
+                        <h4 class="mb-0">{{ $pembayaranPendingCount }}</h4>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="avatar-sm">
+                            <span class="avatar-title bg-warning rounded-circle">
+                                <i class="bi bi-clock fs-4"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-value">{{ $tagihanPending }}</div>
-            <div class="stat-label">Menunggu Verifikasi</div>
         </div>
     </div>
-    <div class="col-md-3 mb-4">
-        <div class="stat-card danger">
-            <div class="stat-icon">
-                <i class="bi bi-x-circle me-2 text-danger"></i>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-hover">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <span class="text-muted mb-1">Perlu Tindakan</span>
+                        <h4 class="mb-0">{{ $totalNotifikasi }}</h4>
+                    </div>
+                    <div class="flex-shrink-0">
+                        <div class="avatar-sm">
+                            <span class="avatar-title bg-danger rounded-circle">
+                                <i class="bi bi-exclamation-triangle fs-4"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="stat-value">{{ $tagihanRejected }}</div>
-            <div class="stat-label">Ditolak</div>
         </div>
     </div>
 </div>
+
+<!-- Section Notifikasi -->
+@if($totalTagihanNotif > 0 || $pembayaranPendingCount > 0 || $pembayaranRejectedCount > 0 || $pembayaranPartialCount > 0)
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bell-fill me-2"></i>
+                    Notifikasi & Peringatan
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Notifikasi Tagihan -->
+                @if($tagihanUnpaidCount > 0)
+                <div class="alert alert-danger d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle me-3 fs-4"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">Tagihan Belum Dibayar</h6>
+                        <p class="mb-0">Anda memiliki <strong>{{ $tagihanUnpaidCount }} tagihan</strong> yang belum dibayar.</p>
+                    </div>
+                    <a href="{{ route('murid.tagihan.index') }}" class="btn btn-sm btn-outline-danger">
+                        Bayar Sekarang
+                    </a>
+                </div>
+                @endif
+
+                @if($tagihanPartialCount > 0)
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="bi bi-arrow-repeat me-3 fs-4"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">Tagihan Masih Cicilan</h6>
+                        <p class="mb-0">Anda memiliki <strong>{{ $tagihanPartialCount }} tagihan</strong> yang masih dalam proses cicilan.</p>
+                    </div>
+                    <a href="{{ route('murid.tagihan.index') }}" class="btn btn-sm btn-outline-warning">
+                        Lanjutkan Cicilan
+                    </a>
+                </div>
+                @endif
+
+                <!-- Notifikasi Pembayaran -->
+                @if($pembayaranPendingCount > 0)
+                <div class="alert alert-info d-flex align-items-center">
+                    <i class="bi bi-clock-history me-3 fs-4"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">Pembayaran Menunggu Verifikasi</h6>
+                        <p class="mb-0">Anda memiliki <strong>{{ $pembayaranPendingCount }} pembayaran</strong> yang sedang menunggu verifikasi admin.</p>
+                    </div>
+                    <a href="{{ route('murid.pembayaran.history') }}" class="btn btn-sm btn-outline-info">
+                        Lihat Detail
+                    </a>
+                </div>
+                @endif
+
+                @if($pembayaranRejectedCount > 0)
+                <div class="alert alert-danger d-flex align-items-center">
+                    <i class="bi bi-x-circle me-3 fs-4"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">Pembayaran Ditolak</h6>
+                        <p class="mb-0">Anda memiliki <strong>{{ $pembayaranRejectedCount }} pembayaran</strong> yang ditolak. Silakan upload ulang bukti pembayaran.</p>
+                    </div>
+                    <a href="{{ route('murid.pembayaran.history') }}" class="btn btn-sm btn-outline-danger">
+                        Upload Ulang
+                    </a>
+                </div>
+                @endif
+
+                @if($pembayaranPartialCount > 0)
+                <div class="alert alert-warning d-flex align-items-center">
+                    <i class="bi bi-arrow-repeat me-3 fs-4"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">Pembayaran Cicilan</h6>
+                        <p class="mb-0">Anda memiliki <strong>{{ $pembayaranPartialCount }} pembayaran cicilan</strong> yang masih belum lunas.</p>
+                    </div>
+                    <a href="{{ route('murid.pembayaran.history') }}" class="btn btn-sm btn-outline-warning">
+                        Lanjutkan Bayar
+                    </a>
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
+<!-- Section Tagihan Cicilan -->
+@if($tagihanPartial->count() > 0)
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Tagihan Masih Cicilan
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    @foreach($tagihanPartial as $tagihan)
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-info">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="card-title mb-0">{{ $tagihan->keterangan }}</h6>
+                                    <span class="badge bg-info">Cicilan</span>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">Total Tagihan:</small>
+                                    <div class="fw-bold">Rp {{ number_format($tagihan->jumlah, 0, ',', '.') }}</div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <small class="text-muted">Sudah Dibayar:</small>
+                                    <div class="fw-bold text-success">Rp {{ number_format($tagihan->total_dibayar, 0, ',', '.') }}</div>
+                                </div>
+
+                                <div class="mb-2">
+                                    <small class="text-muted">Sisa:</small>
+                                    <div class="fw-bold text-warning">Rp {{ number_format($tagihan->sisa_tagihan, 0, ',', '.') }}</div>
+                                </div>
+
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: {{ $tagihan->persentase_dibayar }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ number_format($tagihan->persentase_dibayar, 1) }}% terbayar</small>
+
+                                <div class="mt-3">
+                                    <a href="{{ route('murid.tagihan.index') }}" class="btn btn-sm btn-warning w-100">
+                                        <i class="bi bi-credit-card me-1"></i>
+                                        Lanjutkan Cicilan
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
 
 <!-- Pembayaran Pending & Ditolak -->
 <div class="row mb-4">

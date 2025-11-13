@@ -311,85 +311,133 @@ class AdminController extends Controller
             'alasan_reject' => 'required|string|min:5|max:500'
         ]);
 
-        // Debug: Cek data yang diterima
-        logger('Reject Request Data:', $request->all());
-        logger('Auth User:', [auth()->user() ? auth()->user()->id : 'No user']);
+        try {
+            DB::beginTransaction();
 
-        $pembayaran = Pembayaran::with('tagihan')->find($id);
-        
-        if (!$pembayaran) {
-            logger('Pembayaran not found:', ['id' => $id]);
-            return back()->with('error', 'Pembayaran tidak ditemukan.');
-        }
-
-        logger('Pembayaran before update:', $pembayaran->toArray());
-
-        // Update langsung tanpa transaction dulu
-        $pembayaran->status = 'rejected';
-        $pembayaran->alasan_reject = $request->alasan_reject;
-        $pembayaran->tanggal_proses = now();
-        $pembayaran->admin_id = auth()->id();
-        
-        $saved = $pembayaran->save();
-        
-        logger('Pembayaran after update:', [
-            'saved' => $saved,
-            'pembayaran' => $pembayaran->fresh()->toArray()
-        ]);
-
-        if ($saved) {
-            // Update tagihan jika ada
-            if ($pembayaran->tagihan) {
-                $pembayaran->tagihan->update(['status' => 'unpaid']);
-                logger('Tagihan updated:', ['tagihan_id' => $pembayaran->tagihan->id]);
-            }
-
-            return back()->with('success', 'Pembayaran berhasil ditolak dengan alasan.');
-        } else {
-            logger('Failed to save pembayaran');
-            return back()->with('error', 'Gagal menyimpan perubahan.');
-        }
-    }
-
-    public function approvePembayaran($id)
-    {
-        DB::transaction(function () use ($id) {
             $pembayaran = Pembayaran::with('tagihan')->findOrFail($id);
             
+            // Update pembayaran
             $pembayaran->update([
-                'status' => 'accepted',
+                'status' => 'rejected',
+                'alasan_reject' => $request->alasan_reject,
                 'tanggal_proses' => now(),
                 'admin_id' => auth()->id()
             ]);
 
-            // Jika ada tagihan terkait, update status tagihan
+            // Update status tagihan jika ada
             if ($pembayaran->tagihan) {
-                $pembayaran->tagihan->update(['status' => 'success']);
+                $pembayaran->tagihan->update(['status' => 'unpaid']);
             }
 
             // Buat notifikasi untuk murid
             Notification::create([
                 'user_id' => $pembayaran->user_id,
-                'type' => 'pembayaran_diterima',
-                'title' => 'Pembayaran Diterima',
-                'message' => "Pembayaran Anda sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . " telah diterima",
+                'type' => 'pembayaran_ditolak',
+                'title' => 'Pembayaran Ditolak',
+                'message' => "Pembayaran Anda sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . " ditolak. Alasan: " . $request->alasan_reject,
                 'data' => [
                     'pembayaran_id' => $pembayaran->id,
                     'jumlah' => $pembayaran->jumlah,
-                    'status' => 'accepted'
+                    'status' => 'rejected',
+                    'alasan_reject' => $request->alasan_reject
                 ],
                 'related_type' => 'App\Models\Pembayaran',
                 'related_id' => $pembayaran->id
             ]);
 
-            // Kirim event realtime ke murid
-            if (class_exists('App\Events\StatusPembayaranDiupdate')) {
-                broadcast(new \App\Events\StatusPembayaranDiupdate($pembayaran));
-            }
-        });
+            DB::commit();
 
-        return back()->with('success', 'Pembayaran berhasil disetujui.');
+            return back()->with('success', 'Pembayaran berhasil ditolak.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error rejecting payment: ' . $e->getMessage());
+            return back()->with('error', 'Gagal menolak pembayaran: ' . $e->getMessage());
+        }
     }
+
+    public function approvePembayaran($id)
+{
+    DB::transaction(function () use ($id) {
+        $pembayaran = Pembayaran::with('tagihan')->findOrFail($id);
+        
+        $pembayaran->update([
+            'status' => 'accepted',
+            'tanggal_proses' => now(),
+            'admin_id' => auth()->id()
+        ]);
+
+        // Untuk TAGIHAN
+        if ($pembayaran->tagihan) {
+            $tagihan = $pembayaran->tagihan;
+            
+            // Hitung TOTAL semua pembayaran yang sudah accepted
+            $totalDibayar = $tagihan->pembayaran()
+                ->where('status', 'accepted')
+                ->sum('jumlah');
+            
+            // Tentukan jenis bayar berdasarkan apakah sudah lunas atau masih cicilan
+            if ($totalDibayar >= $tagihan->jumlah) {
+                // SUDAH LUNAS - Total semua pembayaran >= jumlah tagihan
+                $pembayaran->update(['jenis_bayar' => 'lunas']);
+                $tagihan->update(['status' => 'success']);
+            } else {
+                // MASIH CICILAN - Total pembayaran masih kurang
+                $pembayaran->update(['jenis_bayar' => 'cicilan']);
+                $tagihan->update(['status' => 'unpaid']); // Tetap unpaid sampai lunas
+            }
+        }
+        // Untuk SPP
+        else {
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+            $jumlahBulan = ($pembayaran->bulan_akhir - $pembayaran->bulan_mulai) + 1;
+            $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+            
+            if ($pembayaran->jumlah >= $totalHarusBayar) {
+                $pembayaran->update(['jenis_bayar' => 'lunas']);
+            } else {
+                $pembayaran->update(['jenis_bayar' => 'cicilan']);
+            }
+        }
+
+        // Buat notifikasi
+        $this->createPembayaranNotification($pembayaran);
+    });
+
+    return back()->with('success', 'Pembayaran berhasil disetujui.');
+}
+
+private function createPembayaranNotification($pembayaran)
+{
+    $jenis = $pembayaran->tagihan_id ? 'tagihan' : 'SPP';
+    $status = $pembayaran->isLunas() ? 'LUNAS' : 'CICILAN';
+    
+    if ($pembayaran->tagihan) {
+        $tagihan = $pembayaran->tagihan;
+        $sisa = $tagihan->sisa_tagihan;
+        
+        $message = "Pembayaran {$jenis} sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . 
+                  " telah diterima. Status: {$status}. Sisa: Rp " . number_format($sisa, 0, ',', '.');
+    } else {
+        $message = "Pembayaran {$jenis} sebesar Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . 
+                  " telah diterima. Status: {$status}";
+    }
+
+    Notification::create([
+        'user_id' => $pembayaran->user_id,
+        'type' => 'pembayaran_diterima',
+        'title' => 'Pembayaran Diterima',
+        'message' => $message,
+        'data' => [
+            'pembayaran_id' => $pembayaran->id,
+            'jumlah' => $pembayaran->jumlah,
+            'jenis_bayar' => $pembayaran->jenis_bayar
+        ],
+        'related_type' => 'App\Models\Pembayaran',
+        'related_id' => $pembayaran->id
+    ]);
+}
 
     // Detail pembayaran
     public function showPembayaran($id)

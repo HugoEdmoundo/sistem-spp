@@ -22,6 +22,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::put('/murid/{id}', [AdminController::class, 'muridUpdate'])->name('admin.murid.update');
     Route::post('/murid/{id}/toggle', [AdminController::class, 'muridToggle'])->name('admin.murid.toggle');
     Route::post('/murid/{id}/reset-password', [AdminController::class, 'resetPassword'])->name('admin.murid.reset-password');
+    Route::get('/murid/{id}/tagihan', [AdminController::class, 'muridTagihanDetail'])->name('admin.murid.tagihan.detail');
     Route::get('/murid/{id}/pembayaran', [AdminController::class, 'muridPembayaran'])->name('admin.murid.pembayaran');
     
     // Tagihan Management
@@ -75,7 +76,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
 Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/dashboard', [MuridController::class, 'dashboard'])->name('murid.dashboard');
     Route::get('/tagihan', [MuridController::class, 'tagihanIndex'])->name('murid.tagihan.index');
+    Route::post('/tagihan/upload-bukti/{tagihan}', [MuridController::class, 'uploadBukti'])->name('murid.tagihan.upload-bukti');
     Route::get('/bayar-spp', [MuridController::class, 'showBayarSpp'])->name('murid.bayar.spp.page');
+    Route::post('/pembayaran/upload/{tagihan}', [MuridController::class, 'uploadBukti'])->name('murid.pembayaran.upload');
     Route::post('/bayar-spp', [MuridController::class, 'bayarSpp'])->name('murid.bayar.spp');
     Route::post('/upload-bukti/{id}', [MuridController::class, 'uploadBukti'])->name('murid.upload.bukti');
     Route::get('/pembayaran/history', [MuridController::class, 'pembayaranHistory'])->name('murid.pembayaran.history');

@@ -1,5 +1,6 @@
 <?php
 // app/Models/Tagihan.php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,15 +13,15 @@ class Tagihan extends Model
     protected $fillable = [
         'user_id',
         'jenis',
-        'keterangan',
+        'keterangan', 
         'jumlah',
-        'status'
+        'status' // unpaid, pending, success
     ];
 
-    // Casting untuk dates
     protected $casts = [
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'jumlah' => 'decimal:2'
     ];
 
     // Relasi
@@ -31,20 +32,10 @@ class Tagihan extends Model
 
     public function pembayaran()
     {
-        return $this->hasOne(Pembayaran::class);
+        return $this->hasMany(Pembayaran::class);
     }
 
-    // Scope
-    public function scopeSpp($query)
-    {
-        return $query->where('jenis', 'spp');
-    }
-
-    public function scopeCustom($query)
-    {
-        return $query->where('jenis', 'custom');
-    }
-
+    // Scopes
     public function scopeUnpaid($query)
     {
         return $query->where('status', 'unpaid');
@@ -60,44 +51,140 @@ class Tagihan extends Model
         return $query->where('status', 'success');
     }
 
-    // Accessor untuk format bulan
-    public function getNamaBulanAttribute()
+    public function scopeBelumLunas($query)
     {
-        if ($this->bulan) {
-            $monthNames = [
-                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-            ];
-            return $monthNames[$this->bulan] ?? null;
+        return $query->whereIn('status', ['unpaid', 'pending']);
+    }
+
+    public static function generateTagihanSpp($userId, $tahun, $bulanMulai, $bulanAkhir)
+    {
+        $sppSetting = SppSetting::latest()->first();
+        if (!$sppSetting) {
+            throw new \Exception('Setting SPP belum diatur');
         }
-        return null;
+
+        $nominalSpp = $sppSetting->nominal;
+        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+        $totalTagihan = $nominalSpp * $jumlahBulan;
+
+        // Buat tagihan SPP
+        $tagihan = self::create([
+            'user_id' => $userId,
+            'jenis' => 'spp',
+            'keterangan' => 'SPP ' . $jumlahBulan . ' bulan (' . 
+                        User::getNamaBulanStatic($bulanMulai) . ' - ' . 
+                        User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun . ')',
+            'jumlah' => $totalTagihan,
+            'status' => 'unpaid'
+        ]);
+
+        return $tagihan;
     }
 
-    // Accessor untuk periode
-    public function getPeriodeAttribute()
+    // Scope untuk SPP
+    public function scopeSpp($query)
     {
-        if ($this->bulan && $this->tahun) {
-            return $this->nama_bulan . ' ' . $this->tahun;
-        }
-        return '-';
+        return $query->where('jenis', 'spp');
     }
 
-    // Method untuk cek apakah bisa diedit
-    public function getCanEditAttribute()
+    public function scopeNonSpp($query)
     {
-        return !$this->pembayaran && $this->status === 'unpaid';
+        return $query->where('jenis', '!=', 'spp');
     }
 
-    // Method untuk cek apakah bisa dihapus
-    public function getCanDeleteAttribute()
-    {
-        return !$this->pembayaran && $this->status === 'unpaid';
-    }
-
-    // Format jumlah ke Rupiah
+    // Accessors
     public function getJumlahFormattedAttribute()
     {
         return 'Rp ' . number_format($this->jumlah, 0, ',', '.');
+    }
+
+    public function getTotalDibayarAttribute()
+    {
+        return $this->pembayaran()
+            ->where('status', 'accepted')
+            ->sum('jumlah');
+    }
+
+    public function getTotalDibayarFormattedAttribute()
+    {
+        return 'Rp ' . number_format($this->total_dibayar, 0, ',', '.');
+    }
+
+    public function getSisaTagihanAttribute()
+    {
+        return max(0, $this->jumlah - $this->total_dibayar);
+    }
+
+    public function getSisaTagihanFormattedAttribute()
+    {
+        return 'Rp ' . number_format($this->sisa_tagihan, 0, ',', '.');
+    }
+
+    public function getPersentaseDibayarAttribute()
+    {
+        if ($this->jumlah == 0) return 0;
+        return ($this->total_dibayar / $this->jumlah) * 100;
+    }
+
+    public function getStatusLabelAttribute()
+    {
+        return [
+            'unpaid' => 'Belum Lunas',
+            'pending' => 'Menunggu',
+            'success' => 'Lunas'
+        ][$this->status] ?? $this->status;
+    }
+
+    // Cek status
+    public function getIsLunasAttribute()
+    {
+        return $this->status === 'success';
+    }
+
+    public function getIsUnpaidAttribute()
+    {
+        return $this->status === 'unpaid';
+    }
+
+    public function getIsPendingAttribute()
+    {
+        return $this->status === 'pending';
+    }
+
+    // Cek apakah masih bisa bayar (cicilan)
+    public function getIsCicilanAttribute()
+    {
+        return $this->total_dibayar > 0 && $this->total_dibayar < $this->jumlah;
+    }
+
+    // Methods
+    public function bisaBayar()
+    {
+        return !$this->is_lunas;
+    }
+
+    public function getMinimalPembayaranBerikutnya()
+    {
+        $sisa = $this->sisa_tagihan;
+        $minimal = max(1000, $sisa * 0.1); // 10% dari sisa atau 1000
+        return min($minimal, $sisa);
+    }
+
+    // Update status otomatis berdasarkan TOTAL pembayaran
+    public function updateStatus()
+    {
+        if ($this->total_dibayar >= $this->jumlah) {
+            $this->update(['status' => 'success']);
+        } elseif ($this->pembayaran()->where('status', 'pending')->exists()) {
+            $this->update(['status' => 'pending']);
+        } else {
+            $this->update(['status' => 'unpaid']);
+        }
+    }
+
+    // Cek apakah dengan jumlah tertentu akan melunasi
+    public function akanLunasDenganJumlah($jumlah)
+    {
+        return ($this->total_dibayar + $jumlah) >= $this->jumlah;
     }
 }

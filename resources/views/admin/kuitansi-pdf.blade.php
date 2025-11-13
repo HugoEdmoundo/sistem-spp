@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{{-- <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
@@ -387,5 +387,89 @@
       Dicetak otomatis pada: {{ $tanggal_sekarang }} pukul {{ $jam_sekarang }}
     </div>
   </div>
+</body>
+</html> --}}
+
+
+
+
+<!-- resources/views/admin/kuitansi-pdf.blade.php -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Kuitansi Pembayaran</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .content { margin: 20px 0; }
+        .footer { margin-top: 30px; }
+        .table-detail { width: 100%; border-collapse: collapse; }
+        .table-detail td { padding: 8px; border: 1px solid #000; }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .terbilang { font-style: italic; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>KUITANSI PEMBAYARAN</h2>
+        <h3>SEKOLAH MENENGAH PERTAMA</h3>
+        <p>Jl. Contoh No. 123, Kota Contoh</p>
+        <hr>
+    </div>
+
+    <div class="content">
+        <table class="table-detail">
+            <tr>
+                <td width="30%">Telah Terima Dari</td>
+                <td>: {{ $pembayaran->user->nama }}</td>
+            </tr>
+            <tr>
+                <td>Untuk Pembayaran</td>
+                <td>: {{ $pembayaran->keterangan }}</td>
+            </tr>
+            <tr>
+                <td>Jumlah</td>
+                <td>: <strong>{{ $pembayaran->jumlah_formatted }}</strong></td>
+            </tr>
+            @if($pembayaran->isCicilan() && $pembayaran->tagihan)
+            <tr>
+                <td>Jenis Pembayaran</td>
+                <td>: <strong>CICILAN</strong></td>
+            </tr>
+            <tr>
+                <td>Total Tagihan</td>
+                <td>: {{ $pembayaran->tagihan->jumlah_formatted }}</td>
+            </tr>
+            <tr>
+                <td>Total Dibayar</td>
+                <td>: {{ $pembayaran->tagihan->total_dibayar_formatted }}</td>
+            </tr>
+            <tr>
+                <td>Sisa Tagihan</td>
+                <td>: <strong>{{ $pembayaran->tagihan->sisa_tagihan_formatted }}</strong></td>
+            </tr>
+            @endif
+            <tr>
+                <td>Metode Pembayaran</td>
+                <td>: {{ $pembayaran->metode }}</td>
+            </tr>
+            <tr>
+                <td>Terbilang</td>
+                <td>: <em>{{ terbilang($pembayaran->jumlah) }} Rupiah</em></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="footer">
+        <div style="float: right; text-align: center;">
+            <p>Kota Contoh, {{ $tanggal_sekarang }}</p>
+            <br><br><br>
+            <p><strong>{{ $pembayaran->admin ? $pembayaran->admin->nama : 'Admin' }}</strong></p>
+            <p>Admin Sekolah</p>
+        </div>
+        <div style="clear: both;"></div>
+    </div>
 </body>
 </html>

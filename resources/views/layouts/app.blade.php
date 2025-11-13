@@ -263,12 +263,18 @@
           margin-left: auto;
           background: var(--danger);
           color: white;
-          border-radius: 50px;
-          padding: 0.25rem 0.5rem;
+          border-radius: 50%; /* bikin bulet sempurna */
+          width: 22px; /* ukuran bulet */
+          height: 22px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           font-size: 0.75rem;
           font-weight: 600;
           animation: pulse 2s infinite;
+          box-shadow: 0 0 6px rgba(255, 0, 0, 0.5);
         }
+
 
         @keyframes pulse {
           0% {
@@ -1104,46 +1110,63 @@
                       </a>
                   </div>
               </div>
-              @else
-              <div class="nav-section">
-                  <div class="nav-section-title">Menu Murid</div>
-                  <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
-                          <i class="bi bi-speedometer2"></i>
-                          <span>Dashboard</span>
-                      </a>
-                  </div>
-                  <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
-                          <i class="bi bi-receipt"></i>
-                          <span>Tagihan Saya</span>
-                      </a>
-                  </div>
-                  <!-- TAMBAH MENU BAYAR SPP -->
-                  <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('murid.bayar.spp.page') ? 'active' : '' }}" href="{{ route('murid.bayar.spp.page') }}">
-                          <i class="bi bi-credit-card"></i>
-                          <span>Bayar SPP</span>
-                      </a>
-                  </div>
-                  <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
-                          <i class="bi bi-clock-history"></i>
-                          <span>Riwayat</span>
-                      </a>
-                  </div>
-              </div>
+              <!-- Di file layout app.blade.php - bagian sidebar murid -->
+            @else
+            <div class="nav-section">
+                <div class="nav-section-title">Menu Murid</div>
+                <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('murid.dashboard') ? 'active' : '' }}" href="{{ route('murid.dashboard') }}">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </div>
+                <!-- Di sidebar murid -->
+                <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
+                        <i class="bi bi-receipt"></i>
+                        <span>Tagihan Saya</span>
+                        @php
+                            $unpaidTagihanCount = auth()->user()->tagihan()
+                                ->where('status', 'unpaid')
+                                ->count();
+                            $cicilanTagihanCount = auth()->user()->tagihan()
+                                ->where('status', '!=', 'success')
+                                ->whereHas('pembayaran', function($q) {
+                                    $q->where('status', 'accepted');
+                                })
+                                ->count();
+                            $totalNotif = $unpaidTagihanCount + $cicilanTagihanCount;
+                        @endphp
+                        @if($totalNotif > 0)
+                        <span class="nav-badge">{{ $totalNotif }}</span>
+                        @endif
+                    </a>
+                </div>
 
-              <div class="nav-section">
-                  <div class="nav-section-title">Lainnya</div>
-                  <div class="nav-item">
-                      <a class="nav-link {{ request()->routeIs('murid.profile') ? 'active' : '' }}" href="{{ route('murid.profile') }}">
-                          <i class="bi bi-person"></i>
-                          <span>Profile Saya</span>
-                      </a>
-                  </div>
-              </div>
-              @endif
+                <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('murid.bayar.spp.page') ? 'active' : '' }}" href="{{ route('murid.bayar.spp.page') }}">
+                        <i class="bi bi-credit-card"></i>
+                        <span>Buat Tagihan SPP</span>
+                    </a>
+                </div>
+                <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('murid.pembayaran.*') ? 'active' : '' }}" href="{{ route('murid.pembayaran.history') }}">
+                        <i class="bi bi-clock-history"></i>
+                        <span>Riwayat</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="nav-section">
+                <div class="nav-section-title">Lainnya</div>
+                <div class="nav-item">
+                    <a class="nav-link {{ request()->routeIs('murid.profile') ? 'active' : '' }}" href="{{ route('murid.profile') }}">
+                        <i class="bi bi-person"></i>
+                        <span>Profile Saya</span>
+                    </a>
+                </div>
+            </div>
+            @endif
             </nav>
 
             <div class="sidebar-footer">

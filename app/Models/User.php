@@ -314,6 +314,176 @@ class User extends Authenticatable
         return $bulanArr[$bulan] ?? 'Bulan ' . $bulan;
     }
 
+    /**
+     * Cek apakah bisa bayar SPP dengan cicilan
+     */
+    public function bisaBayarSppCicilan($tahun, $bulanMulai, $bulanAkhir, $jumlahBayar): array
+    {
+        // Validasi input
+        if ($bulanMulai < 1 || $bulanMulai > 12 || $bulanAkhir < 1 || $bulanAkhir > 12) {
+            return [
+                'bisa_proses' => false,
+                'error' => 'Bulan harus antara 1-12'
+            ];
+        }
+
+        if ($bulanMulai > $bulanAkhir) {
+            return [
+                'bisa_proses' => false,
+                'error' => 'Bulan mulai tidak boleh lebih besar dari bulan akhir'
+            ];
+        }
+
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+        $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+
+        // Untuk cicilan, jumlah bayar bisa kurang dari total
+        if ($jumlahBayar <= 0) {
+            return [
+                'bisa_proses' => false,
+                'error' => 'Jumlah bayar harus lebih dari 0'
+            ];
+        }
+
+        // Cek bulan yang sudah lunas (tidak bisa dicicil lagi)
+        $bulanSudahLunas = [];
+        for ($bulan = $bulanMulai; $bulan <= $bulanAkhir; $bulan++) {
+            if ($this->isBulanSudahLunas($tahun, $bulan)) {
+                $bulanSudahLunas[] = $bulan;
+            }
+        }
+
+        if (!empty($bulanSudahLunas)) {
+            $bulanNames = array_map(function($bulan) {
+                return $this->getNamaBulan($bulan);
+            }, $bulanSudahLunas);
+            
+            return [
+                'bisa_proses' => false,
+                'error' => 'Bulan ' . implode(', ', $bulanNames) . ' sudah lunas. Tidak bisa dicicil lagi.'
+            ];
+        }
+
+        return [
+            'bisa_proses' => true,
+            'total_harus_bayar' => $totalHarusBayar,
+            'jumlah_bulan' => $jumlahBulan,
+            'sisa' => $totalHarusBayar - $jumlahBayar,
+            'persentase' => ($jumlahBayar / $totalHarusBayar) * 100
+        ];
+    }
+
+    /**
+     * Cek apakah bulan sudah lunas (bukan cicilan)
+     */
+    public function isBulanSudahLunas($tahun, $bulan): bool
+    {
+        $pembayaran = $this->pembayaran()
+            ->where('status', 'accepted')
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where(function($query) use ($bulan) {
+                $query->where(function($q) use ($bulan) {
+                    $q->whereNotNull('bulan_mulai')
+                      ->whereNotNull('bulan_akhir')
+                      ->where('bulan_mulai', '<=', $bulan)
+                      ->where('bulan_akhir', '>=', $bulan)
+                      ->where('jenis_bayar', 'lunas');
+                });
+            })
+            ->first();
+
+        return (bool) $pembayaran;
+    }
+
+    /**
+     * Get status SPP dengan detail cicilan
+     */
+    public function getStatusSppTahunanDetail($tahun): array
+    {
+        $bulanStatus = [];
+        
+        // Inisialisasi semua bulan
+        for ($bulan = 1; $bulan <= 12; $bulan++) {
+            $bulanStatus[$bulan] = [
+                'bulan' => $bulan,
+                'nama_bulan' => $this->getNamaBulan($bulan),
+                'status' => 'unpaid', // unpaid, cicilan, paid
+                'total_tagihan' => 0,
+                'total_dibayar' => 0,
+                'sisa' => 0,
+                'persentase' => 0,
+                'pembayaran' => []
+            ];
+        }
+        
+        // Ambil nominal SPP
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+
+        // Set total tagihan untuk semua bulan
+        foreach ($bulanStatus as $bulan => $status) {
+            $bulanStatus[$bulan]['total_tagihan'] = $nominalSpp;
+            $bulanStatus[$bulan]['sisa'] = $nominalSpp;
+        }
+
+        // Ambil semua pembayaran SPP untuk tahun tertentu
+        $pembayaranSpp = $this->pembayaran()
+            ->where('status', 'accepted')
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->orderBy('tanggal_proses', 'asc')
+            ->get();
+
+        // Proses setiap pembayaran
+        foreach ($pembayaranSpp as $pembayaran) {
+            if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
+                $jumlahBulan = ($pembayaran->bulan_akhir - $pembayaran->bulan_mulai) + 1;
+                $jumlahPerBulan = $pembayaran->jumlah / $jumlahBulan;
+                
+                for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
+                    if ($bulan >= 1 && $bulan <= 12) {
+                        $bulanStatus[$bulan]['total_dibayar'] += $jumlahPerBulan;
+                        $bulanStatus[$bulan]['sisa'] = $bulanStatus[$bulan]['total_tagihan'] - $bulanStatus[$bulan]['total_dibayar'];
+                        $bulanStatus[$bulan]['persentase'] = ($bulanStatus[$bulan]['total_dibayar'] / $bulanStatus[$bulan]['total_tagihan']) * 100;
+                        
+                        // Tentukan status
+                        if ($bulanStatus[$bulan]['sisa'] <= 0) {
+                            $bulanStatus[$bulan]['status'] = 'paid';
+                        } elseif ($bulanStatus[$bulan]['total_dibayar'] > 0) {
+                            $bulanStatus[$bulan]['status'] = 'cicilan';
+                        } else {
+                            $bulanStatus[$bulan]['status'] = 'unpaid';
+                        }
+                        
+                        $bulanStatus[$bulan]['pembayaran'][] = [
+                            'id' => $pembayaran->id,
+                            'jumlah' => $jumlahPerBulan,
+                            'tanggal' => $pembayaran->tanggal_proses,
+                            'metode' => $pembayaran->metode,
+                            'jenis_bayar' => $pembayaran->jenis_bayar
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [
+            'sudah_lunas' => array_values(array_filter($bulanStatus, function($item) {
+                return $item['status'] === 'paid';
+            })),
+            'masih_cicilan' => array_values(array_filter($bulanStatus, function($item) {
+                return $item['status'] === 'cicilan';
+            })),
+            'belum_bayar' => array_values(array_filter($bulanStatus, function($item) {
+                return $item['status'] === 'unpaid';
+            })),
+            'semua_bulan' => array_values($bulanStatus)
+        ];
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

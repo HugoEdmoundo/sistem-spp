@@ -1,3 +1,4 @@
+<!-- resources/views/murid/profile.blade.php -->
 @extends('layouts.app')
 
 @section('title', 'Profile Murid')
