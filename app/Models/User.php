@@ -161,86 +161,60 @@ class User extends Authenticatable
     /**
      * Get SPP payment status for a specific year - VERSI DIPERBAIKI
      */
-    public function getStatusSppTahunan($tahun): array
-    {
-        $bulanStatus = [];
-        
-        // Inisialisasi semua bulan sebagai unpaid
-        for ($bulan = 1; $bulan <= 12; $bulan++) {
-            $bulanStatus[$bulan] = [
-                'bulan' => $bulan,
-                'nama_bulan' => $this->getNamaBulan($bulan),
-                'status' => 'unpaid',
-                'jumlah' => 0,
-                'metode' => '-'
-            ];
-        }
-        
-        // Ambil pembayaran SPP untuk tahun tertentu
-        $pembayaranSpp = $this->pembayaran()
-            ->where('status', 'accepted')
-            ->whereNull('tagihan_id')
-            ->where('tahun', $tahun)
-            ->orderBy('tanggal_proses', 'asc')
-            ->get();
+    // app/Models/User.php
 
-        // Update status bulan yang sudah dibayar
-        foreach ($pembayaranSpp as $pembayaran) {
-            if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
-                // Jika range bulan valid
-                for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
-                    if ($bulan >= 1 && $bulan <= 12) {
-                        $bulanStatus[$bulan] = [
-                            'bulan' => $bulan,
-                            'nama_bulan' => $this->getNamaBulan($bulan),
-                            'status' => 'paid',
-                            'jumlah' => $pembayaran->jumlah,
-                            'metode' => $pembayaran->metode ?? '-'
-                        ];
-                    }
-                }
-            } else {
-                // Jika tidak ada range bulan, coba deteksi dari keterangan
-                $bulanTerdeteksi = $this->deteksiBulanDariKeterangan($pembayaran->keterangan, $tahun);
-                foreach ($bulanTerdeteksi as $bulan) {
-                    if ($bulan >= 1 && $bulan <= 12) {
-                        $bulanStatus[$bulan] = [
-                            'bulan' => $bulan,
-                            'nama_bulan' => $this->getNamaBulan($bulan),
-                            'status' => 'paid',
-                            'jumlah' => $pembayaran->jumlah,
-                            'metode' => $pembayaran->metode ?? '-'
-                        ];
-                    }
+public function getStatusSppTahunan($tahun): array
+{
+    $bulanStatus = [];
+    
+    // Inisialisasi semua bulan sebagai unpaid
+    for ($bulan = 1; $bulan <= 12; $bulan++) {
+        $bulanStatus[$bulan] = [
+            'bulan' => $bulan,
+            'nama_bulan' => $this->getNamaBulan($bulan),
+            'status' => 'unpaid'
+        ];
+    }
+    
+    // Ambil SEMUA pembayaran SPP untuk tahun tertentu
+    $pembayaranSpp = $this->pembayaran()
+        ->whereNull('tagihan_id') // Hanya pembayaran SPP murni
+        ->where('tahun', $tahun)
+        ->where('status', 'accepted') // Hanya yang diterima
+        ->orderBy('tanggal_proses', 'asc')
+        ->get();
+
+    // Update status bulan berdasarkan pembayaran
+    foreach ($pembayaranSpp as $pembayaran) {
+        if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
+            // Jika range bulan valid
+            for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
+                if ($bulan >= 1 && $bulan <= 12) {
+                    $bulanStatus[$bulan] = [
+                        'bulan' => $bulan,
+                        'nama_bulan' => $this->getNamaBulan($bulan),
+                        'status' => 'paid'
+                    ];
                 }
             }
         }
-
-        // Pisahkan menjadi sudah bayar dan belum bayar
-        $sudahBayar = array_filter($bulanStatus, function($item) {
-            return $item['status'] === 'paid';
-        });
-        
-        $belumBayar = array_filter($bulanStatus, function($item) {
-            return $item['status'] === 'unpaid';
-        });
-
-        return [
-            'sudah_bayar' => array_values($sudahBayar),
-            'belum_bayar' => array_values($belumBayar),
-            'semua_bulan' => array_values($bulanStatus)
-        ];
-
-        // VALIDASI TAHUN
-        if ($tahun < 2024 || $tahun > 2030) {
-            return [
-                'sudah_bayar' => [],
-                'belum_bayar' => [],
-                'error' => 'Tahun tidak valid. Harus antara 2024-2030.'
-            ];
-        }
-        
     }
+
+    // Pisahkan menjadi sudah bayar dan belum bayar
+    $sudahBayar = array_filter($bulanStatus, function($item) {
+        return $item['status'] === 'paid';
+    });
+    
+    $belumBayar = array_filter($bulanStatus, function($item) {
+        return $item['status'] === 'unpaid';
+    });
+
+    return [
+        'sudah_bayar' => array_values($sudahBayar),
+        'belum_bayar' => array_values($belumBayar),
+        'semua_bulan' => array_values($bulanStatus)
+    ];
+}
 
     /**
      * Deteksi bulan dari keterangan - DIPERBAIKI

@@ -27,19 +27,31 @@ use App\Traits\TahunTrait; // ← ADD THIS
 class AdminController extends Controller
 {
     use TahunTrait;
-    public function dashboard()
+   public function dashboard()
     {
+        // Hitung total murid aktif
         $totalMurid = User::where('role', 'murid')->where('aktif', true)->count();
+        
+        // Total tagihan bulan ini (yang belum dibayar)
         $totalTagihanBulanIni = Tagihan::whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
+            ->where('status', 'unpaid')
             ->sum('jumlah');
-        
-        // TOTAL AKHIR = Total Pembayaran Diterima - Total Pengeluaran
+
+        // Total pembayaran yang sudah diterima
         $totalPembayaran = Pembayaran::where('status', 'accepted')->sum('jumlah');
+        
+        // Total pengeluaran
         $totalPengeluaran = Pengeluaran::sum('jumlah');
+        
+        // Total akhir = Pembayaran - Pengeluaran
         $totalAkhir = $totalPembayaran - $totalPengeluaran;
         
+        // Pembayaran pending
         $pembayaranPending = Pembayaran::where('status', 'pending')->count();
+
+        // TOTAL TAGIHAN YANG BELUM DIBAYAR (ini yang diperlukan)
+        $totalTagihan = Tagihan::where('status', 'unpaid')->sum('jumlah');
 
         return view('admin.dashboard', compact(
             'totalMurid', 
@@ -47,7 +59,8 @@ class AdminController extends Controller
             'totalAkhir',
             'totalPembayaran',
             'totalPengeluaran',
-            'pembayaranPending'
+            'pembayaranPending',
+            'totalTagihan' // ← TAMBAHKAN INI
         ));
     }
 
@@ -539,19 +552,34 @@ private function createPembayaranNotification($pembayaran)
     public function pembayaranManualCreate()
     {
         $murid = User::where('role', 'murid')->where('aktif', true)->get();
-        $tagihan = Tagihan::where('status', 'unpaid')->get();
+        
+        // Ambil tagihan yang BELUM LUNAS saja (bisa dicicil)
+        $tagihan = Tagihan::whereIn('status', ['unpaid', 'pending'])
+            ->with(['user', 'pembayaran' => function($query) {
+                $query->where('status', 'accepted');
+            }])
+            ->get()
+            ->map(function($tagihan) {
+                // Hitung total dibayar dan sisa
+                $tagihan->total_dibayar = $tagihan->pembayaran->sum('jumlah');
+                $tagihan->sisa_tagihan = $tagihan->jumlah - $tagihan->total_dibayar;
+                return $tagihan;
+            })
+            ->filter(function($tagihan) {
+                // Hanya tampilkan tagihan yang masih ada sisanya
+                return $tagihan->sisa_tagihan > 0;
+            });
         
         $sppSetting = SppSetting::orderBy('berlaku_mulai', 'desc')->first();
         $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
         
-        // TAMBAHKAN INI UNTUK PASS TAHUN KE VIEW
         $tahunUntukSelect = $this->getTahunUntukSelect(2024, 2030);
         
         return view('admin.pembayaran.manual-create', compact(
             'murid', 
             'tagihan', 
             'nominalSpp',
-            'tahunUntukSelect' // ← ADD THIS
+            'tahunUntukSelect'
         ));
     }
     
@@ -562,95 +590,167 @@ private function createPembayaranNotification($pembayaran)
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'tipe_pembayaran' => 'required|in:spp,tagihan',
-            'jumlah' => 'required|numeric|min:0',
+            'jumlah' => 'required|numeric|min:1000',
             'metode' => 'required|in:Tunai,Transfer,QRIS',
             'keterangan' => 'required|string',
+            'tanggal_bayar' => 'required|date'
         ]);
 
-        if ($request->tipe_pembayaran == 'tagihan') {
-            $request->validate([
-                'tagihan_id' => 'required|exists:tagihans,id'
-            ]);
-
-            // Validasi: cek apakah tagihan sudah lunas
-            $tagihan = Tagihan::find($request->tagihan_id);
-            if ($tagihan->status == 'success') {
-                return back()->with('error', '❌ Tagihan ini sudah lunas! Tidak bisa melakukan pembayaran manual.')->withInput();
-            }
-        } else {
-            $request->validate([
-                'bulan_mulai' => 'required|integer|min:1|max:12',
-                'bulan_akhir' => 'required|integer|min:1|max:12',
-                'tahun' => 'required|integer'
-            ]);
-
-            // Validasi range bulan
-            if ($request->bulan_mulai > $request->bulan_akhir) {
-                return back()->with('error', '❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!')->withInput();
-            }
-
-            // VALIDASI: Cek duplikasi SPP
-            $user = User::find($request->user_id);
-            $validasiPembayaran = $user->bisaBayarSpp($request->tahun, $request->bulan_mulai, $request->bulan_akhir);
-            
-            if (!$validasiPembayaran['bisa_proses']) {
-                $bulanSudahDibayar = $validasiPembayaran['sudah_dibayar'];
-                $bulanNames = array_map(function($bulan) {
-                    return User::getNamaBulanStatic($bulan);
-                }, $bulanSudahDibayar);
-                
-                $errorMessage = '❌ Tidak bisa melakukan pembayaran manual karena bulan ' . implode(', ', $bulanNames) . ' sudah dibayar. Silakan pilih bulan lain.';
-                return back()->with('error', $errorMessage)->withInput();
-            }
-
-            // Validasi jumlah SPP
-            $sppSetting = SppSetting::latest()->first();
-            $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
-            $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
-            $jumlahSeharusnya = $nominalSppPerBulan * $jumlahBulan;
-            
-            // Beri toleransi ±10% untuk pembayaran manual
-            $toleransi = $jumlahSeharusnya * 0.1;
-            $minimal = $jumlahSeharusnya - $toleransi;
-            $maksimal = $jumlahSeharusnya + $toleransi;
-            
-            if ($request->jumlah < $minimal || $request->jumlah > $maksimal) {
-                return back()->with('error', "❌ Jumlah pembayaran tidak sesuai! Untuk $jumlahBulan bulan seharusnya Rp " . number_format($jumlahSeharusnya, 0, ',', '.') . " (±10%)")->withInput();
-            }
-        }
-        
         try {
             DB::beginTransaction();
 
-            $pembayaran = Pembayaran::create([
-                'user_id' => $request->user_id,
-                'tagihan_id' => $request->tipe_pembayaran == 'tagihan' ? $request->tagihan_id : null,
-                'jenis_bayar' => 'lunas',
-                'keterangan' => $request->keterangan,
-                'jumlah' => $request->jumlah,
-                'metode' => $request->metode,
-                'bukti' => null,
-                'status' => 'accepted',
-                'tanggal_proses' => now(),
-                'admin_id' => auth()->id(),
-                'tanggal_upload' => now(),
-                'tahun' => $request->tahun ?? null,
-                'bulan_mulai' => $request->bulan_mulai ?? null,
-                'bulan_akhir' => $request->bulan_akhir ?? null
-            ]);
+            $user = User::findOrFail($request->user_id);
 
-            if ($request->tipe_pembayaran == 'spp') {
-                $this->handleSPP($request);
+            if ($request->tipe_pembayaran == 'tagihan') {
+                $request->validate([
+                    'tagihan_id' => 'required|exists:tagihans,id'
+                ]);
+
+                $tagihan = Tagihan::find($request->tagihan_id);
+                
+                // Validasi: pastikan tagihan milik user yang dipilih
+                if ($tagihan->user_id != $request->user_id) {
+                    return back()->with('error', '❌ Tagihan tidak sesuai dengan murid yang dipilih!')->withInput();
+                }
+
+                // Validasi jumlah bayar tidak melebihi sisa tagihan
+                if ($request->jumlah > $tagihan->sisa_tagihan) {
+                    return back()->with('error', '❌ Jumlah bayar melebihi sisa tagihan! Sisa: Rp ' . number_format($tagihan->sisa_tagihan, 0, ',', '.'))->withInput();
+                }
+
+                // Tentukan jenis bayar
+                $akanLunas = $tagihan->akanLunasDenganJumlah($request->jumlah);
+                $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
+
+                // Buat pembayaran
+                $pembayaran = Pembayaran::create([
+                    'tagihan_id' => $tagihan->id,
+                    'user_id' => $request->user_id,
+                    'metode' => $request->metode,
+                    'bukti' => null, // Manual payment no bukti
+                    'jumlah' => $request->jumlah,
+                    'status' => 'accepted', // Langsung accepted karena manual
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => $jenisBayar,
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => $request->tanggal_bayar,
+                    'tanggal_proses' => now(),
+                    'admin_id' => auth()->id()
+                ]);
+
+                // Update status tagihan
+                if ($akanLunas) {
+                    $tagihan->update(['status' => 'success']);
+                } else {
+                    $tagihan->update(['status' => 'unpaid']); // Tetap unpaid karena masih cicilan
+                }
+
             } else {
-                $this->handleTagihan($request);
+                // PEMBAYARAN SPP MANUAL
+                $request->validate([
+                    'bulan_mulai' => 'required|integer|min:1|max:12',
+                    'bulan_akhir' => 'required|integer|min:1|max:12',
+                    'tahun' => 'required|integer'
+                ]);
+
+                // Validasi range bulan
+                if ($request->bulan_mulai > $request->bulan_akhir) {
+                    return back()->with('error', '❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!')->withInput();
+                }
+
+                // Cek apakah sudah ada tagihan SPP untuk periode tersebut
+                $existingTagihan = Tagihan::where('user_id', $request->user_id)
+                    ->where('jenis', 'spp')
+                    ->where('keterangan', 'like', '%' . $request->tahun . '%')
+                    ->get();
+
+                $bulanSudahAda = [];
+                foreach ($existingTagihan as $tagihan) {
+                    // Extract bulan dari keterangan
+                    preg_match_all('/\b(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\b/', $tagihan->keterangan, $matches);
+                    
+                    foreach ($matches[0] as $namaBulan) {
+                        $bulan = array_search($namaBulan, [
+                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+                        ]);
+                        if ($bulan) {
+                            $bulanSudahAda[] = $bulan;
+                        }
+                    }
+                }
+
+                // Filter bulan yang overlap dengan request
+                $bulanOverlap = [];
+                for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
+                    if (in_array($bulan, $bulanSudahAda)) {
+                        $bulanOverlap[] = $bulan;
+                    }
+                }
+
+                if (!empty($bulanOverlap)) {
+                    $bulanNames = array_map(function($bulan) {
+                        return User::getNamaBulanStatic($bulan);
+                    }, $bulanOverlap);
+                    
+                    return back()->with('error', '❌ Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki tagihan SPP!')->withInput();
+                }
+
+                // Generate tagihan SPP
+                $tagihanSpp = Tagihan::generateTagihanSpp(
+                    $request->user_id,
+                    $request->tahun,
+                    $request->bulan_mulai,
+                    $request->bulan_akhir
+                );
+
+                // Tentukan jenis bayar
+                $sppSetting = SppSetting::latest()->first();
+                $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+                $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
+                $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+
+                $jenisBayar = $request->jumlah >= $totalHarusBayar ? 'lunas' : 'cicilan';
+
+                // Buat pembayaran
+                $pembayaran = Pembayaran::create([
+                    'tagihan_id' => $tagihanSpp->id,
+                    'user_id' => $request->user_id,
+                    'metode' => $request->metode,
+                    'bukti' => null,
+                    'jumlah' => $request->jumlah,
+                    'status' => 'accepted',
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => $jenisBayar,
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => $request->tanggal_bayar,
+                    'tanggal_proses' => now(),
+                    'admin_id' => auth()->id(),
+                    'tahun' => $request->tahun,
+                    'bulan_mulai' => $request->bulan_mulai,
+                    'bulan_akhir' => $request->bulan_akhir
+                ]);
+
+                // Update status tagihan SPP
+                if ($jenisBayar == 'lunas') {
+                    $tagihanSpp->update(['status' => 'success']);
+                } else {
+                    $tagihanSpp->update(['status' => 'unpaid']);
+                }
             }
 
-            // Buat notifikasi
+            // Buat notifikasi untuk murid
             Notification::create([
                 'user_id' => $request->user_id,
                 'type' => 'pembayaran_manual',
                 'title' => 'Pembayaran Manual',
-                'message' => "Pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " telah dicatat",
+                'message' => "Admin mencatat pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " untuk " . ($request->tipe_pembayaran == 'spp' ? 'SPP' : 'tagihan'),
+                'data' => [
+                    'pembayaran_id' => $pembayaran->id,
+                    'jumlah' => $request->jumlah,
+                    'tipe' => $request->tipe_pembayaran
+                ],
                 'related_type' => 'App\Models\Pembayaran',
                 'related_id' => $pembayaran->id
             ]);

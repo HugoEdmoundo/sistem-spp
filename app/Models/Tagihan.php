@@ -188,3 +188,4 @@ class Tagihan extends Model
         return ($this->total_dibayar + $jumlah) >= $this->jumlah;
     }
 }
+

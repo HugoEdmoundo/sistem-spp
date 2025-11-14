@@ -1,112 +1,254 @@
 {{-- resources/views/admin/laporan/index.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Laporan')
+@section('title', 'Laporan Keuangan')
 
 @section('content')
-<div class="main-content">
-    <div class="page-header">
-        <div class="header-title">
-            <h1 class="fw-bold mb-2">Laporan Keuangan</h1>
-            <p class="text-muted mb-0">Kelola dan ekspor laporan SPP serta pengeluaran</p>
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex align-items-center">
+            <div class="bg-primary rounded p-2 me-3">
+                <i class="bi bi-file-earmark-text text-white fs-4"></i>
+            </div>
+            <div>
+                <h4 class="mb-0 fw-bold">Laporan Keuangan</h4>
+                <p class="text-muted mb-0">Laporan SPP, Tagihan, dan Pengeluaran</p>
+            </div>
         </div>
-        <div class="header-actions">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-0">
-                    <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}" class="text-decoration-none">Dashboard</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Laporan</li>
-                </ol>
-            </nav>
+        <div class="text-end">
+            <small class="text-muted">{{ now()->translatedFormat('l, d F Y') }}</small>
         </div>
     </div>
 
     <!-- Filter Tahun -->
     <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body py-3">
+        <div class="card-body">
             <form method="GET" action="{{ route('admin.laporan.index') }}" class="row g-3 align-items-center">
-                <div class="col-auto">
-                    <label for="tahun" class="col-form-label fw-medium">Tahun Laporan:</label>
-                </div>
-                <div class="col-auto">
-                    <select name="tahun" id="tahun" class="form-select form-select-sm border-secondary-subtle" style="min-width: 120px;">
-                        @for($i = date('Y'); $i >= 2020; $i--)
-                            <option value="{{ $i }}" {{ $tahun == $i ? 'selected' : '' }}>{{ $i }}</option>
-                        @endfor
+                <div class="col-md-4">
+                    <label for="tahun" class="form-label">Tahun <span class="text-danger">*</span></label>
+                    <select name="tahun" class="form-select" id="tahun" required>
+                        <option value="">Pilih Tahun</option>
+                        @foreach($tahunUntukSelect as $tahunItem)
+                            <option value="{{ $tahunItem }}" {{ $tahunItem == $tahun ? 'selected' : '' }}>
+                                {{ $tahunItem }}
+                            </option>
+                        @endforeach
                     </select>
                 </div>
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="fas fa-filter me-1"></i>Filter
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-filter me-1"></i>Filter
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="row g-3">
+    <div class="row">
         <!-- Laporan SPP -->
-        <div class="col-12">
+        <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="m-0 fw-bold">
-                            <i class="fas fa-file-invoice-dollar me-2"></i>Laporan SPP
-                        </h6>
-                        <small class="opacity-75">Tahun {{ $tahun }}</small>
-                    </div>
-                    <div class="btn-group">
-                        <a href="{{ route('admin.laporan.export.spp.excel', $tahun) }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-file-excel text-success me-1"></i> Excel
-                        </a>
-                        <a href="{{ route('admin.laporan.export.spp.pdf', $tahun) }}" class="btn btn-light btn-sm">
-                            <i class="fas fa-file-pdf text-danger me-1"></i> PDF
-                        </a>
+                <div class="card-header bg-primary text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">
+                                <i class="bi bi-file-earmark-text me-2"></i>Laporan Pembayaran SPP
+                            </h5>
+                            <small class="opacity-75">Tahun {{ $tahun }} - Status Per Bulan</small>
+                        </div>
+                        <div class="btn-group">
+                            <a href="{{ route('admin.laporan.export.spp.excel', $tahun) }}" 
+                               class="btn btn-light btn-sm" 
+                               title="Export Excel">
+                                <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
+                            </a>
+                            <a href="{{ route('admin.laporan.export.spp.pdf', $tahun) }}" 
+                               class="btn btn-light btn-sm" 
+                               title="Export PDF">
+                                <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF
+                            </a>
+                        </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
-                    @if(is_array($dataMurid) && count($dataMurid) > 0)
+                <div class="card-body">
+                    @if(is_array($dataSpp) && count($dataSpp) > 0)
+                        @foreach($dataSpp as $dataMurid)
+                        <div class="mb-5">
+                            <!-- Header Murid -->
+                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded">
+                                <div>
+                                    <h6 class="mb-1 fw-bold text-primary">{{ $dataMurid['murid']->nama }}</h6>
+                                    <small class="text-muted">{{ $dataMurid['murid']->email }} | {{ $dataMurid['murid']->username }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <small class="text-muted">Total SPP Tahun {{ $tahun }}</small>
+                                    <div class="fw-bold text-success">
+                                        Rp {{ number_format(collect($dataMurid['bulan'])->sum('total_dibayar'), 0, ',', '.') }}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tabel Bulan SPP -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover mb-4">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th width="10%" class="text-center">Bulan</th>
+                                            <th width="15%" class="text-center">Status</th>
+                                            <th width="15%" class="text-center">Total Dibayar</th>
+                                            <th width="15%" class="text-center">Jenis Bayar</th>
+                                            <th width="45%">Detail Pembayaran</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($dataMurid['bulan'] as $bulan => $dataBulan)
+                                        <tr>
+                                            <td class="text-center fw-semibold">
+                                                {{ $dataBulan['nama_bulan'] }}
+                                            </td>
+                                            <td class="text-center">
+                                                @if($dataBulan['status'] === 'LUNAS')
+                                                    <span class="badge bg-success">LUNAS</span>
+                                                @elseif($dataBulan['status'] === 'CICILAN')
+                                                    <span class="badge bg-warning">CICILAN</span>
+                                                @else
+                                                    <span class="badge bg-secondary">BELUM BAYAR</span>
+                                                @endif
+                                            </td>
+                                            <td class="text-center fw-bold 
+                                                @if($dataBulan['total_dibayar'] > 0) text-success @else text-muted @endif">
+                                                Rp {{ number_format($dataBulan['total_dibayar'], 0, ',', '.') }}
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge 
+                                                    @if($dataBulan['jenis_bayar'] === 'lunas') bg-success
+                                                    @elseif($dataBulan['jenis_bayar'] === 'cicilan') bg-warning
+                                                    @else bg-secondary @endif">
+                                                    {{ $dataBulan['jenis_bayar'] ?? 'BELUM BAYAR' }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                @if(count($dataBulan['pembayaran']) > 0)
+                                                    <div class="small">
+                                                        @foreach($dataBulan['pembayaran'] as $pembayaran)
+                                                        <div class="mb-1">
+                                                            @php
+                                                                $rangeBulan = $pembayaran->bulan_mulai == $pembayaran->bulan_akhir ? 
+                                                                    $dataBulan['nama_bulan'] : 
+                                                                    getNamaBulan($pembayaran->bulan_mulai) . ' - ' . getNamaBulan($pembayaran->bulan_akhir);
+                                                            @endphp
+                                                            <span class="badge bg-success me-1">SPP {{ $rangeBulan }}</span>
+                                                            <span>Rp {{ number_format($pembayaran->jumlah, 0, ',', '.') }}</span>
+                                                            <small class="text-muted">({{ $pembayaran->metode }})</small>
+                                                            @if($pembayaran->tagihan_id)
+                                                                <small class="text-info">Via Tagihan</small>
+                                                            @endif
+                                                        </div>
+                                                        @endforeach
+                                                    </div>
+                                                @else
+                                                    <span class="text-muted">Belum ada pembayaran</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                    <tfoot class="table-group-divider">
+                                        <tr class="fw-bold bg-light">
+                                            <td class="text-center">TOTAL</td>
+                                            <td class="text-center">
+                                                @php
+                                                    $bulanLunas = collect($dataMurid['bulan'])->where('status', 'LUNAS')->count();
+                                                    $bulanCicilan = collect($dataMurid['bulan'])->where('status', 'CICILAN')->count();
+                                                    $bulanBelum = collect($dataMurid['bulan'])->where('status', 'BELUM BAYAR')->count();
+                                                @endphp
+                                                <small>Lunas: {{ $bulanLunas }}, Cicilan: {{ $bulanCicilan }}, Belum: {{ $bulanBelum }}</small>
+                                            </td>
+                                            <td class="text-center text-success">
+                                                Rp {{ number_format(collect($dataMurid['bulan'])->sum('total_dibayar'), 0, ',', '.') }}
+                                            </td>
+                                            <td></td>
+                                            <td></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                        <hr class="my-4">
+                        @endforeach
+                    @else
+                    <div class="text-center py-5">
+                        <div class="mb-3">
+                            <i class="bi bi-file-earmark-text display-1 text-muted opacity-50"></i>
+                        </div>
+                        <h5 class="text-muted mb-2">Tidak ada data SPP</h5>
+                        <p class="text-muted mb-0">Tidak ada data pembayaran SPP untuk tahun {{ $tahun }}.</p>
+                    </div>
+                    @endif
+                </div>
+            </div>
+        </div>
+
+        <!-- Laporan Tagihan (Non-SPP) -->
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">
+                                <i class="bi bi-receipt me-2"></i>Laporan Tagihan (Non-SPP)
+                            </h5>
+                            <small class="opacity-75">Tahun {{ $tahun }}</small>
+                        </div>
+                        <div class="btn-group">
+                            <a href="{{ route('admin.laporan.export.tagihan.excel', $tahun) }}" 
+                               class="btn btn-light btn-sm" 
+                               title="Export Excel">
+                                <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    @if(isset($dataTagihan) && $dataTagihan->count() > 0)
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" id="dataTable" width="100%" cellspacing="0">
+                        <table class="table table-bordered table-hover" id="tableTagihan">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="5%" class="ps-3">No</th>
-                                    <th width="20%">Nama Murid</th>
-                                    <th width="20%">Email</th>
-                                    <th width="20%">Bulan Sudah Bayar</th>
-                                    <th width="20%">Bulan Belum Bayar</th>
-                                    <th width="7%" class="text-center">Total Bayar</th>
-                                    <th width="8%" class="text-center">Total Belum</th>
+                                    <th width="5%" class="text-center">No</th>
+                                    <th width="20%">Nama Siswa</th>
+                                    <th width="15%">Jenis Tagihan</th>
+                                    <th width="25%">Keterangan</th>
+                                    <th width="10%" class="text-end">Total Tagihan</th>
+                                    <th width="10%" class="text-end">Dibayar</th>
+                                    <th width="10%" class="text-end">Sisa</th>
+                                    <th width="5%" class="text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach($dataMurid as $index => $data)
+                                @foreach($dataTagihan as $index => $tagihan)
                                 <tr>
-                                    <td class="ps-3">{{ $index + 1 }}</td>
-                                    <td class="fw-medium">{{ $data['murid']->nama ?? 'N/A' }}</td>
-                                    <td class="text-muted">{{ $data['murid']->email ?? 'N/A' }}</td>
+                                    <td class="text-center fw-semibold">{{ $index + 1 }}</td>
                                     <td>
-                                        @if(isset($data['sudah_bayar']) && count($data['sudah_bayar']) > 0)
-                                            @foreach($data['sudah_bayar'] as $bulan)
-                                                <span class="badge bg-success me-1 mb-1">{{ $bulan['nama_bulan'] ?? 'Unknown' }}</span>
-                                            @endforeach
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        <div class="fw-medium text-dark">{{ $tagihan->user->nama ?? 'N/A' }}</div>
+                                        <small class="text-muted">{{ $tagihan->user->email ?? '' }}</small>
                                     </td>
                                     <td>
-                                        @if(isset($data['belum_bayar']) && count($data['belum_bayar']) > 0)
-                                            @foreach($data['belum_bayar'] as $bulan)
-                                                <span class="badge bg-warning me-1 mb-1">{{ $bulan['nama_bulan'] ?? 'Unknown' }}</span>
-                                            @endforeach
-                                        @else
-                                            <span class="badge bg-success">Semua Lunas</span>
-                                        @endif
+                                        <span class="badge bg-primary">{{ $tagihan->jenis }}</span>
                                     </td>
+                                    <td class="text-muted">{{ $tagihan->keterangan }}</td>
+                                    <td class="text-end fw-bold text-dark">Rp {{ number_format($tagihan->jumlah, 0, ',', '.') }}</td>
+                                    <td class="text-end fw-bold text-success">Rp {{ number_format($tagihan->total_dibayar, 0, ',', '.') }}</td>
+                                    <td class="text-end fw-bold text-danger">Rp {{ number_format($tagihan->sisa_tagihan, 0, ',', '.') }}</td>
                                     <td class="text-center">
-                                        <span class="badge bg-info">{{ $data['total_bulan_bayar'] ?? 0 }} Bulan</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="badge bg-secondary">{{ $data['total_bulan_belum_bayar'] ?? 0 }} Bulan</span>
+                                        <span class="badge 
+                                            @if($tagihan->status_detail === 'LUNAS') bg-success
+                                            @elseif($tagihan->status_detail === 'CICILAN') bg-warning
+                                            @else bg-secondary @endif">
+                                            {{ $tagihan->status_detail }}
+                                        </span>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -116,16 +258,10 @@
                     @else
                     <div class="text-center py-5">
                         <div class="mb-3">
-                            <i class="fas fa-file-invoice fa-4x text-muted opacity-50"></i>
+                            <i class="bi bi-receipt display-1 text-muted opacity-50"></i>
                         </div>
-                        <h5 class="text-muted mb-2">Tidak ada data laporan SPP</h5>
-                        <p class="text-muted mb-0">
-                            @if(!is_array($dataMurid))
-                                Data murid tidak tersedia.
-                            @else
-                                Tidak ada data murid yang aktif.
-                            @endif
-                        </p>
+                        <h5 class="text-muted mb-2">Tidak ada data tagihan</h5>
+                        <p class="text-muted mb-0">Tidak ada data tagihan non-SPP untuk tahun {{ $tahun }}.</p>
                     </div>
                     @endif
                 </div>
@@ -135,45 +271,51 @@
         <!-- Laporan Pengeluaran -->
         <div class="col-12">
             <div class="card border-0 shadow-sm">
-                <div class="card-header bg-success text-white py-3 d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="m-0 fw-bold">
-                            <i class="fas fa-receipt me-2"></i>Laporan Pengeluaran
-                        </h6>
-                        <small class="opacity-75">Tahun {{ $tahun }}</small>
-                    </div>
-                    <div class="d-flex align-items-center">
-                        <div class="me-3 bg-white bg-opacity-25 px-2 py-1 rounded">
-                            <span class="fw-medium">Total: <strong>Rp {{ number_format($totalPengeluaran ?? 0, 0, ',', '.') }}</strong></span>
+                <div class="card-header bg-success text-white py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1 fw-bold">
+                                <i class="bi bi-receipt me-2"></i>Laporan Pengeluaran
+                            </h5>
+                            <small class="opacity-75">Tahun {{ $tahun }}</small>
                         </div>
-                        <div class="btn-group">
-                            <a href="{{ route('admin.laporan.export.pengeluaran.excel', $tahun) }}" class="btn btn-light btn-sm">
-                                <i class="fas fa-file-excel text-success me-1"></i> Excel
-                            </a>
-                            <a href="{{ route('admin.laporan.export.pengeluaran.pdf', $tahun) }}" class="btn btn-light btn-sm">
-                                <i class="fas fa-file-pdf text-danger me-1"></i> PDF
-                            </a>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-white bg-opacity-25 px-3 py-1 rounded">
+                                <span class="fw-medium">Total: <strong>Rp {{ number_format($totalPengeluaran ?? 0, 0, ',', '.') }}</strong></span>
+                            </div>
+                            <div class="btn-group">
+                                <a href="{{ route('admin.laporan.export.pengeluaran.excel', $tahun) }}" 
+                                   class="btn btn-light btn-sm" 
+                                   title="Export Excel">
+                                    <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
+                                </a>
+                                <a href="{{ route('admin.laporan.export.pengeluaran.pdf', $tahun) }}" 
+                                   class="btn btn-light btn-sm" 
+                                   title="Export PDF">
+                                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body">
                     @if(isset($pengeluaran) && $pengeluaran->count() > 0)
                     <div class="table-responsive">
-                        <table class="table table-sm table-hover mb-0" id="dataTable2" width="100%" cellspacing="0">
+                        <table class="table table-bordered table-hover" id="tablePengeluaran">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="5%" class="ps-3">No</th>
-                                    <th width="15%">Tanggal</th>
+                                    <th width="5%" class="text-center">No</th>
+                                    <th width="12%">Tanggal</th>
                                     <th width="15%">Kategori</th>
-                                    <th width="30%">Keterangan</th>
-                                    <th width="15%" class="text-end pe-3">Jumlah</th>
-                                    <th width="20%">Admin</th>
+                                    <th width="35%">Keterangan</th>
+                                    <th width="15%" class="text-end">Jumlah</th>
+                                    <th width="18%">Dibuat Oleh</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($pengeluaran as $index => $p)
                                 <tr>
-                                    <td class="ps-3">{{ $index + 1 }}</td>
+                                    <td class="text-center fw-semibold">{{ $index + 1 }}</td>
                                     <td>
                                         <span class="fw-medium">{{ $p->tanggal->format('d/m/Y') }}</span>
                                     </td>
@@ -181,17 +323,31 @@
                                         <span class="badge bg-primary">{{ $p->kategori }}</span>
                                     </td>
                                     <td class="text-muted">{{ $p->keterangan }}</td>
-                                    <td class="text-end fw-bold text-success pe-3">Rp {{ number_format($p->jumlah, 0, ',', '.') }}</td>
+                                    <td class="text-end fw-bold text-danger">Rp {{ number_format($p->jumlah, 0, ',', '.') }}</td>
                                     <td>
-                                        <span class="badge bg-secondary">{{ $p->admin->nama ?? '-' }}</span>
+                                        <div class="d-flex align-items-center">
+                                            @if($p->admin->foto)
+                                                <img src="{{ Storage::url($p->admin->foto) }}" 
+                                                     alt="{{ $p->admin->nama }}" 
+                                                     class="rounded-circle me-2" 
+                                                     width="24" 
+                                                     height="24">
+                                            @else
+                                                <div class="bg-secondary rounded-circle me-2 d-flex align-items-center justify-content-center" 
+                                                     style="width: 24px; height: 24px;">
+                                                    <span class="text-white fw-bold small">{{ substr($p->admin->nama ?? 'A', 0, 1) }}</span>
+                                                </div>
+                                            @endif
+                                            <span class="small">{{ $p->admin->nama ?? '-' }}</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
                             </tbody>
                             <tfoot class="table-group-divider">
                                 <tr class="fw-bold bg-light">
-                                    <td colspan="4" class="text-end ps-3">TOTAL PENGELUARAN:</td>
-                                    <td class="text-end text-primary fs-6 pe-3">Rp {{ number_format($totalPengeluaran ?? 0, 0, ',', '.') }}</td>
+                                    <td colspan="4" class="text-end">TOTAL PENGELUARAN:</td>
+                                    <td class="text-end text-danger fs-6">Rp {{ number_format($totalPengeluaran ?? 0, 0, ',', '.') }}</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -200,7 +356,7 @@
                     @else
                     <div class="text-center py-5">
                         <div class="mb-3">
-                            <i class="fas fa-receipt fa-4x text-muted opacity-50"></i>
+                            <i class="bi bi-receipt display-1 text-muted opacity-50"></i>
                         </div>
                         <h5 class="text-muted mb-2">Tidak ada data pengeluaran</h5>
                         <p class="text-muted mb-0">Tidak ada data pengeluaran untuk tahun {{ $tahun }}.</p>
@@ -211,158 +367,15 @@
         </div>
     </div>
 </div>
-
-<style>
-/* Pastikan konten utama tidak overlap dengan sidebar */
-.main-content {
-    margin-left: 0;
-    padding: 0;
-    width: 100%;
-}
-
-.content-wrapper {
-    padding: 1rem;
-    margin-left: 0;
-}
-
-/* Responsive adjustments */
-@media (min-width: 768px) {
-    .content-wrapper {
-        margin-left: 280px; /* Sesuaikan dengan lebar sidebar */
-        padding: 1.5rem;
-    }
-}
-
-/* Untuk mobile */
-@media (max-width: 767.98px) {
-    .content-wrapper {
-        margin-left: 0;
-        padding: 1rem;
-    }
-}
-
-/* Table responsive fixes */
-.table-responsive {
-    border-radius: 0.375rem;
-}
-
-.table {
-    margin-bottom: 0;
-    font-size: 0.875rem;
-}
-
-.table th {
-    border-top: none;
-    padding: 0.75rem;
-    background-color: #f8f9fa;
-    font-weight: 600;
-}
-
-.table td {
-    padding: 0.75rem;
-    vertical-align: middle;
-}
-
-/* Card adjustments */
-.card {
-    margin-bottom: 1rem;
-}
-
-.card-header {
-    padding: 1rem 1.25rem;
-}
-
-.card-body {
-    padding: 0;
-}
-
-/* Badge styling */
-.badge {
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-/* Button adjustments */
-.btn-sm {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.875rem;
-}
-
-/* Form controls */
-.form-select-sm {
-    padding: 0.375rem 2.25rem 0.375rem 0.75rem;
-    font-size: 0.875rem;
-}
-</style>
-
 @endsection
 
-@section('scripts')
-<script>
-    $(document).ready(function() {
-        @if(is_array($dataMurid) && count($dataMurid) > 0)
-        $('#dataTable').DataTable({
-            "pageLength": 25,
-            "responsive": true,
-            "searching": true,
-            "info": true,
-            "paging": true,
-            "autoWidth": false,
-            "language": {
-                "search": "<i class='fas fa-search me-1'></i>Cari:",
-                "lengthMenu": "Tampilkan _MENU_ data",
-                "zeroRecords": "Tidak ada data yang ditemukan",
-                "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-                "infoEmpty": "Menampilkan 0 sampai 0 dari 0 data",
-                "infoFiltered": "(disaring dari _MAX_ total data)",
-                "paginate": {
-                    "previous": "<i class='fas fa-chevron-left'></i>",
-                    "next": "<i class='fas fa-chevron-right'></i>"
-                }
-            },
-            "dom": '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
-        });
-        @endif
-        
-        @if(isset($pengeluaran) && $pengeluaran->count() > 0)
-        $('#dataTable2').DataTable({
-            "pageLength": 25,
-            "responsive": true,
-            "order": [[1, 'desc']],
-            "searching": true,
-            "info": true,
-            "paging": true,
-            "autoWidth": false,
-            "language": {
-                "search": "<i class='fas fa-search me-1'></i>Cari:",
-                "lengthMenu": "Tampilkan _MENU_ data",
-                "zeroRecords": "Tidak ada data yang ditemukan",
-                "info": "Menampilkan _START_ sampai _END_ dari _TOTAL_ data",
-                "infoEmpty": "Menampilkan 0 sampai 0 dari 0 data",
-                "infoFiltered": "(disaring dari _MAX_ total data)",
-                "paginate": {
-                    "previous": "<i class='fas fa-chevron-left'></i>",
-                    "next": "<i class='fas fa-chevron-right'></i>"
-                }
-            },
-            "dom": '<"row"<"col-md-6"l><"col-md-6"f>>rt<"row"<"col-md-6"i><"col-md-6"p>>'
-        });
-        @endif
-
-        // Handle responsive behavior
-        function handleResponsiveLayout() {
-            if (window.innerWidth <= 768) {
-                $('.content-wrapper').css('margin-left', '0');
-            } else {
-                $('.content-wrapper').css('margin-left', '280px');
-            }
-        }
-
-        // Initial call
-        handleResponsiveLayout();
-
-        // Call on resize
-        $(window).resize(handleResponsiveLayout);
-    });
-</script>
-@endsection
+{{-- @php
+function getNamaBulan($bulan) {
+    $bulanArr = [
+        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+    ];
+    return $bulanArr[$bulan] ?? 'Bulan ' . $bulan;
+}
+@endphp --}}

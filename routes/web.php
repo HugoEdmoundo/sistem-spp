@@ -62,14 +62,23 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     // Riwayat Pembayaran
     Route::get('/pembayaran/history', [AdminController::class, 'pembayaranHistory'])->name('admin.pembayaran.history');
     
-    // Laporan Routes - DIPINDAH ke group terpisah untuk menghindari konflik
-    Route::prefix('laporan')->group(function () {
-        Route::get('/', [LaporanController::class, 'index'])->name('admin.laporan.index');
-        Route::get('/spp/export/excel/{tahun}', [LaporanController::class, 'exportSppExcel'])->name('admin.laporan.export.spp.excel');
-        Route::get('/spp/export/pdf/{tahun}', [LaporanController::class, 'exportSppPdf'])->name('admin.laporan.export.spp.pdf');
-        Route::get('/pengeluaran/export/excel/{tahun}', [LaporanController::class, 'exportPengeluaranExcel'])->name('admin.laporan.export.pengeluaran.excel');
-        Route::get('/pengeluaran/export/pdf/{tahun}', [LaporanController::class, 'exportPengeluaranPdf'])->name('admin.laporan.export.pengeluaran.pdf');
-    });
+    // Laporan Routes
+    Route::get('/laporan', [LaporanController::class, 'index'])->name('admin.laporan.index');
+    
+    // Export SPP
+    Route::get('/laporan/export/spp/excel/{tahun}', [LaporanController::class, 'exportSppExcel'])->name('admin.laporan.export.spp.excel');
+    Route::get('/laporan/export/spp/pdf/{tahun}', [LaporanController::class, 'exportSppPdf'])->name('admin.laporan.export.spp.pdf');
+    
+    // Export Tagihan
+    Route::get('/laporan/export/tagihan/excel/{tahun}', [LaporanController::class, 'exportTagihanExcel'])->name('admin.laporan.export.tagihan.excel');
+    Route::get('/laporan/export/tagihan/pdf/{tahun}', [LaporanController::class, 'exportTagihanPdf'])->name('admin.laporan.export.tagihan.pdf');
+    
+    // Export Pengeluaran
+    Route::get('/laporan/export/pengeluaran/excel/{tahun}', [LaporanController::class, 'exportPengeluaranExcel'])->name('admin.laporan.export.pengeluaran.excel');
+    Route::get('/laporan/export/pengeluaran/pdf/{tahun}', [LaporanController::class, 'exportPengeluaranPdf'])->name('admin.laporan.export.pengeluaran.pdf');
+    
+    // Debug route (opsional)
+    Route::get('/laporan/debug/{userId?}/{tahun?}', [LaporanController::class, 'debugData'])->name('admin.laporan.debug');
 });
 
 // Murid Routes

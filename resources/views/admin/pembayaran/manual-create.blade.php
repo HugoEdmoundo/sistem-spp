@@ -1,4 +1,4 @@
-
+<!-- resources/views/admin/pembayaran/manual-create.blade.php -->
 @extends('layouts.app')
 
 @section('title', 'Buat Pembayaran Manual')
@@ -8,9 +8,18 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4><i class="bi bi-cash-coin me-2"></i>Buat Pembayaran Manual</h4>
+            <a href="{{ route('admin.pembayaran.history') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>Kembali
+            </a>
         </div>
     </div>
 </div>
+
+@if(session('error'))
+    <div class="alert alert-danger">
+        {{ session('error') }}
+    </div>
+@endif
 
 <div class="row">
     <div class="col-lg-8">
@@ -19,12 +28,6 @@
                 <h5 class="mb-0">Form Pembayaran Manual</h5>
             </div>
             <div class="card-body">
-                @if(session('error'))
-                    <div class="alert alert-danger">
-                        {{ session('error') }}
-                    </div>
-                @endif
-
                 <form action="{{ route('admin.pembayaran.manual.store') }}" method="POST" id="formPembayaran">
                     @csrf
                     
@@ -45,23 +48,23 @@
                         </div>
                     </div>
 
+                    <!-- Data Murid -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="user_id" class="form-label">Murid <span class="text-danger">*</span></label>
+                            <select class="form-select" id="user_id" name="user_id" required>
+                                <option value="">Pilih Murid</option>
+                                @foreach($murid as $m)
+                                    <option value="{{ $m->id }}">
+                                        {{ $m->nama }} ({{ $m->username }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Form SPP -->
                     <div id="formSpp">
-                        <!-- Data Murid untuk SPP -->
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="user_id" class="form-label">Murid <span class="text-danger">*</span></label>
-                                <select class="form-select" id="user_id" name="user_id" required>
-                                    <option value="">Pilih Murid</option>
-                                    @foreach($murid as $m)
-                                        <option value="{{ $m->id }}">
-                                            {{ $m->nama }} ({{ $m->username }})
-                                        </option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <label for="bulan_mulai" class="form-label">Dari Bulan <span class="text-danger">*</span></label>
@@ -81,7 +84,6 @@
                                     @endfor
                                 </select>
                             </div>
-                            <!-- GANTI BAGIAN TAHUN SELECT DENGAN INI: -->
                             <div class="col-md-4">
                                 <label for="tahun" class="form-label">Tahun <span class="text-danger">*</span></label>
                                 <select name="tahun" class="form-select" id="tahun" required>
@@ -94,6 +96,27 @@
                                 </select>
                             </div>
                         </div>
+
+                        <!-- Info SPP Otomatis -->
+                        <div class="card border-info mb-3" id="infoSpp" style="display: none;">
+                            <div class="card-body">
+                                <h6 class="card-title">Informasi SPP</h6>
+                                <div class="row">
+                                    <div class="col-4">
+                                        <small class="text-muted">Jumlah Bulan</small>
+                                        <div class="fw-bold" id="infoJumlahBulan">-</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">Nominal/Bulan</small>
+                                        <div class="fw-bold">Rp {{ number_format($nominalSpp, 0, ',', '.') }}</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">Total Tagihan</small>
+                                        <div class="fw-bold text-primary" id="infoTotalSpp">-</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Form Tagihan -->
@@ -104,59 +127,106 @@
                                 <option value="">Pilih Tagihan</option>
                                 @foreach($tagihan as $t)
                                     <option value="{{ $t->id }}" 
-                                        data-jumlah="{{ $t->jumlah }}" 
-                                        data-keterangan="{{ $t->keterangan }}"
+                                        data-jumlah="{{ $t->jumlah }}"
+                                        data-dibayar="{{ $t->total_dibayar }}"
+                                        data-sisa="{{ $t->sisa_tagihan }}"
                                         data-user-id="{{ $t->user_id }}">
-                                        {{ $t->user->nama }} - {{ $t->keterangan }} - Rp {{ number_format($t->jumlah, 0, ',', '.') }}
+                                        {{ $t->user->nama }} - {{ $t->keterangan }} - 
+                                        Sisa: Rp {{ number_format($t->sisa_tagihan, 0, ',', '.') }}
                                     </option>
                                 @endforeach
                             </select>
-                        </div>
-                    </div>
-
-                    <!-- Jumlah dan Metode -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="jumlah" class="form-label">Jumlah <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <span class="input-group-text">Rp</span>
-                                <!-- UBAH: readonly dan tambah hidden input untuk jumlah -->
-                                <input type="text" class="form-control" id="jumlah_display" readonly style="background-color: #f8f9fa;">
-                                <input type="hidden" id="jumlah" name="jumlah" required>
+                            @if($tagihan->count() == 0)
+                            <div class="text-muted mt-2">
+                                <i class="bi bi-info-circle"></i> Tidak ada tagihan yang bisa dicicil
                             </div>
-                            <small class="text-muted">Jumlah otomatis terisi berdasarkan pilihan</small>
+                            @endif
                         </div>
-                        <div class="col-md-6">
-                            <label for="metode" class="form-label">Metode <span class="text-danger">*</span></label>
-                            <select class="form-select" id="metode" name="metode" required>
-                                <option value="Tunai">Tunai</option>
-                                <option value="Transfer">Transfer</option>
-                                <option value="QRIS">QRIS</option>
-                            </select>
+
+                        <!-- Info Tagihan -->
+                        <div class="card border-primary mb-3" id="infoTagihan" style="display: none;">
+                            <div class="card-body">
+                                <h6 class="card-title">Informasi Tagihan</h6>
+                                <div class="row">
+                                    <div class="col-4">
+                                        <small class="text-muted">Total Tagihan</small>
+                                        <div class="fw-bold" id="infoTotalTagihan">-</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">Sudah Dibayar</small>
+                                        <div class="fw-bold text-success" id="infoDibayar">-</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <small class="text-muted">Sisa Tagihan</small>
+                                        <div class="fw-bold text-warning" id="infoSisaTagihan">-</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Keterangan -->
-                    <div class="mb-3">
-                        <label for="keterangan" class="form-label">Keterangan <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="keterangan" name="keterangan" required readonly style="background-color: #f8f9fa;">
+                    <!-- Informasi Pembayaran -->
+                    <div class="card border-success">
+                        <div class="card-header bg-success text-white">
+                            <h6 class="mb-0">Informasi Pembayaran</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="jumlah" class="form-label">Jumlah Bayar <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">Rp</span>
+                                        <input type="number" class="form-control" id="jumlah" name="jumlah" 
+                                               value="1000" min="1000" required>
+                                    </div>
+                                    <div class="form-text" id="infoMinMax">
+                                        Minimal bayar: Rp 1.000
+                                    </div>
+
+                                    <!-- Info Sisa Setelah Bayar -->
+                                    <div id="infoSisa" class="mt-2 alert alert-info py-2" style="display: none;">
+                                        <small>
+                                            <i class="bi bi-info-circle me-1"></i>
+                                            Sisa setelah bayar: <span id="sisaAmount" class="fw-bold"></span>
+                                        </small>
+                                    </div>
+
+                                    <!-- Info Akan Lunas -->
+                                    <div id="infoLunas" class="mt-2 alert alert-success py-2" style="display: none;">
+                                        <small><i class="bi bi-check-circle me-1"></i>Pembayaran ini akan melunasi tagihan!</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <label for="metode" class="form-label">Metode <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="metode" name="metode" required>
+                                        <option value="Tunai">Tunai</option>
+                                        <option value="Transfer">Transfer</option>
+                                        <option value="QRIS">QRIS</option>
+                                    </select>
+
+                                    <label for="tanggal_bayar" class="form-label mt-3">Tanggal Bayar <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="tanggal_bayar" name="tanggal_bayar" 
+                                           value="{{ date('Y-m-d') }}" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="keterangan" class="form-label">Keterangan <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="keterangan" name="keterangan" 
+                                       value="Pembayaran manual oleh admin" required>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Tanggal dan Catatan -->
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="tanggal_bayar" class="form-label">Tanggal Bayar <span class="text-danger">*</span></label>
-                            <input type="date" class="form-control" id="tanggal_bayar" name="tanggal_bayar" value="{{ date('Y-m-d') }}" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="catatan_admin" class="form-label">Catatan Admin</label>
-                            <textarea class="form-control" id="catatan_admin" name="catatan_admin" rows="2"></textarea>
-                        </div>
+                    <div class="d-flex gap-3 mt-4">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="bi bi-check-circle me-2"></i>Simpan Pembayaran Manual
+                        </button>
+                        <a href="{{ route('admin.pembayaran.history') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle me-2"></i>Batal
+                        </a>
                     </div>
-
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle me-2"></i>Simpan Pembayaran
-                    </button>
                 </form>
             </div>
         </div>
@@ -173,14 +243,14 @@
                     <p class="mb-2 small">Fitur untuk mencatat pembayaran yang dilakukan secara langsung/tunai di tempat.</p>
                 </div>
 
-                <div class="alert alert-success" id="infoSpp">
+                <div class="alert alert-success" id="infoCardSpp">
                     <h6 class="alert-heading">Pembayaran SPP</h6>
-                    <p class="small mb-0">• Pilih murid dan periode SPP<br>• Sistem hitung otomatis total<br>• Jumlah tidak bisa diubah</p>
+                    <p class="small mb-0">• Buat tagihan SPP otomatis<br>• Bisa bayar cicilan<br>• System hitung otomatis</p>
                 </div>
 
-                <div class="alert alert-warning" id="infoTagihan" style="display: none;">
+                <div class="alert alert-warning" id="infoCardTagihan" style="display: none;">
                     <h6 class="alert-heading">Pembayaran Tagihan</h6>
-                    <p class="small mb-0">• Pilih tagihan yang sudah ada<br>• Murid otomatis terpilih<br>• Jumlah otomatis dari tagihan</p>
+                    <p class="small mb-0">• Pilih tagihan yang sudah ada<br>• Bisa bayar cicilan<br>• Progress otomatis update</p>
                 </div>
             </div>
         </div>
@@ -193,135 +263,194 @@ document.addEventListener('DOMContentLoaded', function() {
     const tipeTagihan = document.getElementById('tipe_tagihan');
     const formSpp = document.getElementById('formSpp');
     const formTagihan = document.getElementById('formTagihan');
+    const infoCardSpp = document.getElementById('infoCardSpp');
+    const infoCardTagihan = document.getElementById('infoCardTagihan');
     const userSelect = document.getElementById('user_id');
     const tagihanSelect = document.getElementById('tagihan_id');
     const bulanMulai = document.getElementById('bulanMulai');
     const bulanAkhir = document.getElementById('bulanAkhir');
     const tahun = document.getElementById('tahun');
-    const jumlahDisplay = document.getElementById('jumlah_display');
     const jumlahInput = document.getElementById('jumlah');
-    const keteranganInput = document.getElementById('keterangan');
-    const infoSpp = document.getElementById('infoSpp');
-    const infoTagihan = document.getElementById('infoTagihan');
-
-    // Ambil nominal SPP dari PHP (dilewatkan dari controller)
+    const infoMinMax = document.getElementById('infoMinMax');
+    const infoSisa = document.getElementById('infoSisa');
+    const infoLunas = document.getElementById('infoLunas');
+    const sisaAmount = document.getElementById('sisaAmount');
     const nominalSpp = {{ $nominalSpp }};
+
+    let maxJumlah = 0;
+    let currentSisa = 0;
 
     // Toggle form
     function toggleForms() {
         if (tipeSpp.checked) {
             formSpp.style.display = 'block';
             formTagihan.style.display = 'none';
-            infoSpp.style.display = 'block';
-            infoTagihan.style.display = 'none';
+            infoCardSpp.style.display = 'block';
+            infoCardTagihan.style.display = 'none';
             
             // Reset dan set required fields
             tagihanSelect.required = false;
-            userSelect.required = true;
             bulanMulai.required = true;
             bulanAkhir.required = true;
             tahun.required = true;
             
-            resetTagihan();
-            calculateSPP();
+            // Reset tagihan
+            tagihanSelect.value = '';
+            document.getElementById('infoTagihan').style.display = 'none';
+            
+            // Update info SPP
+            updateInfoSpp();
+            
         } else {
             formSpp.style.display = 'none';
             formTagihan.style.display = 'block';
-            infoSpp.style.display = 'none';
-            infoTagihan.style.display = 'block';
+            infoCardSpp.style.display = 'none';
+            infoCardTagihan.style.display = 'block';
             
             // Reset dan set required fields
             tagihanSelect.required = true;
-            userSelect.required = false;
             bulanMulai.required = false;
             bulanAkhir.required = false;
             tahun.required = false;
             
-            resetSPP();
+            // Reset SPP
+            document.getElementById('infoSpp').style.display = 'none';
         }
+        
+        // Reset jumlah
+        jumlahInput.value = 1000;
+        jumlahInput.min = 1000;
+        maxJumlah = 0;
+        currentSisa = 0;
+        updateInfoPembayaran();
     }
 
-    function resetSPP() {
-        bulanMulai.value = '';
-        bulanAkhir.value = '';
-        tahun.value = '';
-        jumlahDisplay.value = '';
-        jumlahInput.value = '';
-        keteranganInput.value = '';
-    }
-
-    function resetTagihan() {
-        tagihanSelect.value = '';
-        jumlahDisplay.value = '';
-        jumlahInput.value = '';
-        keteranganInput.value = '';
-    }
-
-    // Event listeners untuk toggle
-    tipeSpp.addEventListener('change', toggleForms);
-    tipeTagihan.addEventListener('change', toggleForms);
-
-    // Auto calculate SPP - PERBAIKAN DI SINI
-    function calculateSPP() {
+    // Update info SPP
+    function updateInfoSpp() {
         const mulai = parseInt(bulanMulai.value);
         const akhir = parseInt(bulanAkhir.value);
-        const tahunVal = tahun.value;
-
+        const tahunVal = parseInt(tahun.value);
+        
         if (mulai && akhir && tahunVal && mulai <= akhir) {
             const jumlahBulan = (akhir - mulai) + 1;
-            const total = jumlahBulan * nominalSpp; // Gunakan nominalSpp dari PHP
+            const totalTagihan = jumlahBulan * nominalSpp;
             
-            // Update display dan hidden input
-            jumlahDisplay.value = 'Rp ' + total.toLocaleString('id-ID');
-            jumlahInput.value = total;
+            // Update info
+            document.getElementById('infoJumlahBulan').textContent = jumlahBulan + ' bulan';
+            document.getElementById('infoTotalSpp').textContent = 'Rp ' + totalTagihan.toLocaleString('id-ID');
             
-            const bulanMulaiNama = new Date(2000, mulai-1).toLocaleString('id-ID', { month: 'long' });
-            const bulanAkhirNama = new Date(2000, akhir-1).toLocaleString('id-ID', { month: 'long' });
+            // Tampilkan info
+            document.getElementById('infoSpp').style.display = 'block';
             
-            if (jumlahBulan === 1) {
-                keteranganInput.value = `Bayar SPP Bulan ${bulanMulaiNama} ${tahunVal}`;
+            // Set max jumlah
+            maxJumlah = totalTagihan;
+            currentSisa = totalTagihan;
+            jumlahInput.max = maxJumlah;
+            infoMinMax.textContent = 'Minimal: Rp 1.000, Maksimal: Rp ' + totalTagihan.toLocaleString('id-ID');
+            
+        } else {
+            document.getElementById('infoSpp').style.display = 'none';
+            maxJumlah = 0;
+            currentSisa = 0;
+        }
+        
+        updateInfoPembayaran();
+    }
+
+    // Update info tagihan
+    tagihanSelect.addEventListener('change', function() {
+        const selected = this.options[this.selectedIndex];
+        const infoTagihan = document.getElementById('infoTagihan');
+        
+        if (selected.value) {
+            const total = parseFloat(selected.getAttribute('data-jumlah'));
+            const dibayar = parseFloat(selected.getAttribute('data-dibayar'));
+            const sisa = parseFloat(selected.getAttribute('data-sisa'));
+            
+            // Update info
+            document.getElementById('infoTotalTagihan').textContent = 'Rp ' + total.toLocaleString('id-ID');
+            document.getElementById('infoDibayar').textContent = 'Rp ' + dibayar.toLocaleString('id-ID');
+            document.getElementById('infoSisaTagihan').textContent = 'Rp ' + sisa.toLocaleString('id-ID');
+            
+            // Tampilkan info
+            infoTagihan.style.display = 'block';
+            
+            // Set max jumlah
+            maxJumlah = sisa;
+            currentSisa = sisa;
+            jumlahInput.max = sisa;
+            jumlahInput.min = 1000;
+            jumlahInput.value = Math.min(1000, sisa); // Set nilai default
+            infoMinMax.textContent = 'Minimal: Rp 1.000, Maksimal: Rp ' + sisa.toLocaleString('id-ID');
+            
+        } else {
+            infoTagihan.style.display = 'none';
+            maxJumlah = 0;
+            currentSisa = 0;
+            jumlahInput.value = 1000;
+        }
+        
+        updateInfoPembayaran();
+    });
+
+    // Update info pembayaran
+    function updateInfoPembayaran() {
+        const jumlah = parseFloat(jumlahInput.value) || 0;
+        const sisaSetelahBayar = currentSisa - jumlah;
+        
+        if (jumlah > 0 && maxJumlah > 0) {
+            // Update info sisa
+            sisaAmount.textContent = 'Rp ' + (sisaSetelahBayar > 0 ? sisaSetelahBayar.toLocaleString('id-ID') : '0');
+            infoSisa.style.display = 'block';
+            
+            // Update info lunas
+            if (sisaSetelahBayar <= 0) {
+                infoLunas.style.display = 'block';
             } else {
-                keteranganInput.value = `Bayar SPP ${jumlahBulan} bulan (${bulanMulaiNama} - ${bulanAkhirNama} ${tahunVal})`;
+                infoLunas.style.display = 'none';
             }
         } else {
-            jumlahDisplay.value = '';
-            jumlahInput.value = '';
-            keteranganInput.value = '';
+            infoSisa.style.display = 'none';
+            infoLunas.style.display = 'none';
         }
     }
 
-    // Auto fill tagihan
-    tagihanSelect.addEventListener('change', function() {
-        const selected = this.options[this.selectedIndex];
-        if (selected.value) {
-            const jumlah = selected.getAttribute('data-jumlah');
-            const keterangan = selected.getAttribute('data-keterangan');
-            const userId = selected.getAttribute('data-user-id');
-            
-            // Set hidden user_id untuk controller
-            document.querySelector('input[name="user_id"]')?.remove();
-            const hiddenInput = document.createElement('input');
-            hiddenInput.type = 'hidden';
-            hiddenInput.name = 'user_id';
-            hiddenInput.value = userId;
-            formPembayaran.appendChild(hiddenInput);
-            
-            // Update display dan hidden input
-            jumlahDisplay.value = 'Rp ' + parseInt(jumlah).toLocaleString('id-ID');
-            jumlahInput.value = jumlah;
-            keteranganInput.value = 'Pembayaran ' + keterangan;
-        } else {
-            resetTagihan();
+    // Event listeners
+    tipeSpp.addEventListener('change', toggleForms);
+    tipeTagihan.addEventListener('change', toggleForms);
+    bulanMulai.addEventListener('change', updateInfoSpp);
+    bulanAkhir.addEventListener('change', updateInfoSpp);
+    tahun.addEventListener('change', updateInfoSpp);
+    jumlahInput.addEventListener('input', updateInfoPembayaran);
+
+    // Validasi sebelum submit
+    document.getElementById('formPembayaran').addEventListener('submit', function(e) {
+        const jumlah = parseFloat(jumlahInput.value) || 0;
+        
+        if (jumlah < 1000) {
+            e.preventDefault();
+            alert('Jumlah bayar minimal Rp 1.000!');
+            return;
+        }
+        
+        if (maxJumlah > 0 && jumlah > maxJumlah) {
+            e.preventDefault();
+            alert('Jumlah bayar melebihi maksimal yang diizinkan!');
+            return;
+        }
+        
+        if (tipeTagihan.checked && !tagihanSelect.value) {
+            e.preventDefault();
+            alert('Pilih tagihan terlebih dahulu!');
+            return;
+        }
+        
+        if (tipeSpp.checked && (!bulanMulai.value || !bulanAkhir.value || !tahun.value)) {
+            e.preventDefault();
+            alert('Lengkapi periode SPP terlebih dahulu!');
+            return;
         }
     });
-
-    // Event listeners untuk SPP - HAPUS userSelect dari sini
-    bulanMulai.addEventListener('change', calculateSPP);
-    bulanAkhir.addEventListener('change', calculateSPP);
-    tahun.addEventListener('change', calculateSPP);
-
-    // Set default metode
-    document.getElementById('metode').value = 'Tunai';
 
     // Initialize
     toggleForms();
