@@ -8,6 +8,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+
+
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
@@ -50,35 +52,43 @@ class User extends Authenticatable
      */
     public function isBulanSudahDibayar($tahun, $bulan): bool
     {
-        $pembayaran = $this->pembayaran()
+        // Cek pembayaran SPP murni (tanpa tagihan_id)
+        $pembayaranSppMurni = $this->pembayaran()
             ->where('status', 'accepted')
             ->whereNull('tagihan_id')
             ->where('tahun', $tahun)
             ->where(function($query) use ($bulan) {
                 $query->where(function($q) use ($bulan) {
-                        $q->whereNotNull('bulan_mulai')
-                        ->whereNotNull('bulan_akhir')
-                        ->where('bulan_mulai', '<=', $bulan)
-                        ->where('bulan_akhir', '>=', $bulan);
-                    })
-                    ->orWhere(function($q) use ($bulan) {
-                        // Untuk data yang tidak punya range bulan, cek dari keterangan
-                        $q->whereNull('bulan_mulai')
-                        ->orWhereNull('bulan_akhir');
-                    });
+                    $q->whereNotNull('bulan_mulai')
+                    ->whereNotNull('bulan_akhir')
+                    ->where('bulan_mulai', '<=', $bulan)
+                    ->where('bulan_akhir', '>=', $bulan);
+                });
             })
-            ->first();
+            ->exists();
 
-        if ($pembayaran) {
-            // Jika tidak ada range bulan, cek dari keterangan
-            if (!$pembayaran->bulan_mulai || !$pembayaran->bulan_akhir) {
-                $bulanTerdeteksi = $this->deteksiBulanDariKeterangan($pembayaran->keterangan, $tahun);
-                return in_array($bulan, $bulanTerdeteksi);
-            }
+        if ($pembayaranSppMurni) {
             return true;
         }
 
-        return false;
+        // Cek pembayaran via tagihan SPP
+        $pembayaranViaTagihan = $this->pembayaran()
+            ->where('status', 'accepted')
+            ->whereHas('tagihan', function($query) {
+                $query->where('jenis', 'spp');
+            })
+            ->where('tahun', $tahun)
+            ->where(function($query) use ($bulan) {
+                $query->where(function($q) use ($bulan) {
+                    $q->whereNotNull('bulan_mulai')
+                    ->whereNotNull('bulan_akhir')
+                    ->where('bulan_mulai', '<=', $bulan)
+                    ->where('bulan_akhir', '>=', $bulan);
+                });
+            })
+            ->exists();
+
+        return $pembayaranViaTagihan;
     }
 
     /**
@@ -162,60 +172,74 @@ class User extends Authenticatable
      * Get SPP payment status for a specific year - VERSI DIPERBAIKI
      */
     // app/Models/User.php
+    public function getStatusSppTahunan($tahun): array
+    {
+        $bulanStatus = [];
+        
+        // Inisialisasi semua bulan sebagai unpaid
+        for ($bulan = 1; $bulan <= 12; $bulan++) {
+            $bulanStatus[$bulan] = [
+                'bulan' => $bulan,
+                'nama_bulan' => $this->getNamaBulan($bulan),
+                'status' => 'unpaid', // unpaid, cicilan, paid
+                'jenis_bayar' => null,
+                'total_dibayar' => 0,
+                'pembayaran' => []
+            ];
+        }
+        
+        // Ambil SEMUA pembayaran SPP untuk tahun tertentu (baik murni maupun via tagihan)
+        $pembayaranSpp = $this->pembayaran()
+            ->where('status', 'accepted')
+            ->where('tahun', $tahun)
+            ->where(function($query) {
+                // SPP murni ATAU SPP via tagihan
+                $query->whereNull('tagihan_id')
+                    ->orWhereHas('tagihan', function($q) {
+                        $q->where('jenis', 'spp');
+                    });
+            })
+            ->with(['tagihan'])
+            ->orderBy('tanggal_proses', 'asc')
+            ->get();
 
-public function getStatusSppTahunan($tahun): array
-{
-    $bulanStatus = [];
-    
-    // Inisialisasi semua bulan sebagai unpaid
-    for ($bulan = 1; $bulan <= 12; $bulan++) {
-        $bulanStatus[$bulan] = [
-            'bulan' => $bulan,
-            'nama_bulan' => $this->getNamaBulan($bulan),
-            'status' => 'unpaid'
-        ];
-    }
-    
-    // Ambil SEMUA pembayaran SPP untuk tahun tertentu
-    $pembayaranSpp = $this->pembayaran()
-        ->whereNull('tagihan_id') // Hanya pembayaran SPP murni
-        ->where('tahun', $tahun)
-        ->where('status', 'accepted') // Hanya yang diterima
-        ->orderBy('tanggal_proses', 'asc')
-        ->get();
-
-    // Update status bulan berdasarkan pembayaran
-    foreach ($pembayaranSpp as $pembayaran) {
-        if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
-            // Jika range bulan valid
-            for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
-                if ($bulan >= 1 && $bulan <= 12) {
-                    $bulanStatus[$bulan] = [
-                        'bulan' => $bulan,
-                        'nama_bulan' => $this->getNamaBulan($bulan),
-                        'status' => 'paid'
-                    ];
+        // Update status bulan berdasarkan pembayaran
+        foreach ($pembayaranSpp as $pembayaran) {
+            if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
+                for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
+                    if ($bulan >= 1 && $bulan <= 12) {
+                        $bulanStatus[$bulan]['pembayaran'][] = $pembayaran;
+                        $bulanStatus[$bulan]['total_dibayar'] += $pembayaran->jumlah;
+                        $bulanStatus[$bulan]['jenis_bayar'] = $pembayaran->jenis_bayar;
+                        
+                        // Update status
+                        if ($pembayaran->jenis_bayar === 'lunas') {
+                            $bulanStatus[$bulan]['status'] = 'paid';
+                        } elseif ($pembayaran->jenis_bayar === 'cicilan') {
+                            $bulanStatus[$bulan]['status'] = 'cicilan';
+                        }
+                    }
                 }
             }
         }
+
+        // Pisahkan menjadi sudah bayar dan belum bayar
+        $sudahBayar = array_filter($bulanStatus, function($item) {
+            return in_array($item['status'], ['paid', 'cicilan']);
+        });
+        
+        $belumBayar = array_filter($bulanStatus, function($item) {
+            return $item['status'] === 'unpaid';
+        });
+
+        return [
+            'sudah_bayar' => array_values($sudahBayar),
+            'belum_bayar' => array_values($belumBayar),
+            'semua_bulan' => array_values($bulanStatus),
+            'total_sudah_bayar' => array_sum(array_column($sudahBayar, 'total_dibayar')),
+            'total_belum_bayar' => (count($belumBayar) * (SppSetting::latest()->first()->nominal ?? 0))
+        ];
     }
-
-    // Pisahkan menjadi sudah bayar dan belum bayar
-    $sudahBayar = array_filter($bulanStatus, function($item) {
-        return $item['status'] === 'paid';
-    });
-    
-    $belumBayar = array_filter($bulanStatus, function($item) {
-        return $item['status'] === 'unpaid';
-    });
-
-    return [
-        'sudah_bayar' => array_values($sudahBayar),
-        'belum_bayar' => array_values($belumBayar),
-        'semua_bulan' => array_values($bulanStatus)
-    ];
-}
-
     /**
      * Deteksi bulan dari keterangan - DIPERBAIKI
      */

@@ -26,10 +26,10 @@ class LaporanController extends Controller
         // Data untuk Laporan SPP (KHUSUS SPP)
         $dataSpp = $this->getLaporanSpp($tahun);
         
-        // Data untuk Laporan Tagihan (KHUSUS TAGIHAN)
+        // Data untuk Laporan Tagihan (KHUSUS TAGIHAN non-SPP)
         $dataTagihan = $this->getLaporanTagihan($tahun);
         
-        // Data untuk Laporan Pengeluaran
+        // Data untuk Laporan Pengeluaran - DIPERBAIKI
         $pengeluaran = Pengeluaran::with('admin')
             ->whereYear('tanggal', $tahun)
             ->orderBy('tanggal', 'desc')
@@ -48,7 +48,7 @@ class LaporanController extends Controller
     }
 
     /**
-     * Method untuk Laporan SPP KHUSUS
+     * Method untuk Laporan SPP KHUSUS - VERSI DIPERBAIKI
      */
     private function getLaporanSpp($tahun)
     {
@@ -67,7 +67,7 @@ class LaporanController extends Controller
             // Inisialisasi semua bulan sebagai belum bayar
             for ($bulan = 1; $bulan <= 12; $bulan++) {
                 $dataMurid['bulan'][$bulan] = [
-                    'nama_bulan' => $this->getNamaBulan($bulan),
+                    'nama_bulan' => User::getNamaBulanStatic($bulan),
                     'status' => 'BELUM BAYAR',
                     'pembayaran' => [],
                     'total_dibayar' => 0,
@@ -79,14 +79,10 @@ class LaporanController extends Controller
             $pembayaranSpp = Pembayaran::where('user_id', $murid->id)
                 ->where('status', 'accepted')
                 ->where(function($query) {
-                    // SPP murni (tanpa tagihan_id) ATAU SPP yang via tagihan
-                    $query->whereNull('tagihan_id')
-                          ->orWhereHas('tagihan', function($q) {
-                              $q->where('jenis', 'spp');
-                          });
+                    // Hanya ambil pembayaran SPP murni (tanpa tagihan_id)
+                    $query->whereNull('tagihan_id');
                 })
                 ->where('tahun', $tahun)
-                ->with(['tagihan'])
                 ->get();
 
             // Proses setiap pembayaran SPP
@@ -150,19 +146,57 @@ class LaporanController extends Controller
     }
 
     /**
-     * Get nama bulan
+     * Export Laporan SPP PDF - VERSI RINGKAS
      */
-    private function getNamaBulan($bulan)
+    public function exportSppPdf($tahun)
     {
-        $bulanArr = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
-        return $bulanArr[$bulan] ?? 'Bulan ' . $bulan;
+        $dataSpp = $this->getLaporanSpp($tahun);
+        
+        $pdf = Pdf::loadView('admin.laporan.export.spp-pdf', [
+            'dataSpp' => $dataSpp,
+            'tahun' => $tahun
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('laporan-spp-' . $tahun . '.pdf');
     }
 
-    // Export Laporan SPP Excel
+    /**
+     * Export Laporan Tagihan PDF - VERSI RINGKAS
+     */
+    public function exportTagihanPdf($tahun)
+    {
+        $dataTagihan = $this->getLaporanTagihan($tahun);
+        
+        $pdf = Pdf::loadView('admin.laporan.export.tagihan-pdf', [
+            'dataTagihan' => $dataTagihan,
+            'tahun' => $tahun
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('laporan-tagihan-' . $tahun . '.pdf');
+    }
+
+    /**
+     * Export Laporan Pengeluaran PDF - VERSI RINGKAS
+     */
+    public function exportPengeluaranPdf($tahun)
+    {
+        $pengeluaran = Pengeluaran::with('admin')
+            ->whereYear('tanggal', $tahun)
+            ->orderBy('tanggal', 'desc')
+            ->get();
+
+        $totalPengeluaran = $pengeluaran->sum('jumlah');
+
+        $pdf = Pdf::loadView('admin.laporan.export.pengeluaran-pdf', [
+            'pengeluaran' => $pengeluaran,
+            'totalPengeluaran' => $totalPengeluaran,
+            'tahun' => $tahun
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download('laporan-pengeluaran-' . $tahun . '.pdf');
+    }
+
+    // Export Laporan SPP Excel - VERSI RINGKAS
     public function exportSppExcel($tahun)
     {
         $dataSpp = $this->getLaporanSpp($tahun);
@@ -191,8 +225,8 @@ class LaporanController extends Controller
                         // Detail pembayaran SPP
                         foreach ($dataBulan['pembayaran'] as $pembayaran) {
                             $rangeBulan = $pembayaran->bulan_mulai == $pembayaran->bulan_akhir ? 
-                                $this->getNamaBulan($pembayaran->bulan_mulai) : 
-                                $this->getNamaBulan($pembayaran->bulan_mulai) . ' - ' . $this->getNamaBulan($pembayaran->bulan_akhir);
+                                User::getNamaBulanStatic($pembayaran->bulan_mulai) : 
+                                User::getNamaBulanStatic($pembayaran->bulan_mulai) . ' - ' . User::getNamaBulanStatic($pembayaran->bulan_akhir);
                             
                             $detailTransaksi[] = "SPP {$rangeBulan}: Rp " . number_format($pembayaran->jumlah, 0, ',', '.') . 
                                                 " (" . $pembayaran->metode . ")" .
@@ -219,16 +253,6 @@ class LaporanController extends Controller
                 return collect($data);
             }
 
-            private function getNamaBulan($bulan)
-            {
-                $bulanArr = [
-                    1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                    5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                ];
-                return $bulanArr[$bulan] ?? 'Bulan ' . $bulan;
-            }
-
             public function headings(): array
             {
                 return [
@@ -249,33 +273,7 @@ class LaporanController extends Controller
         }, 'laporan-spp-' . $tahun . '.xlsx');
     }
 
-    // Export Laporan SPP PDF
-    public function exportSppPdf($tahun)
-    {
-        $dataSpp = $this->getLaporanSpp($tahun);
-        
-        $pdf = Pdf::loadView('admin.laporan.export-spp', [
-            'dataSpp' => $dataSpp,
-            'tahun' => $tahun
-        ])->setPaper('a4', 'landscape');
-
-        return $pdf->download('laporan-spp-' . $tahun . '.pdf');
-    }
-
-    // Export Laporan Tagihan PDF
-    public function exportTagihanPdf($tahun)
-    {
-        $dataTagihan = $this->getLaporanTagihan($tahun);
-        
-        $pdf = Pdf::loadView('admin.laporan.export-tagihan-pdf', [
-            'dataTagihan' => $dataTagihan,
-            'tahun' => $tahun
-        ])->setPaper('a4', 'landscape');
-
-        return $pdf->download('laporan-tagihan-' . $tahun . '.pdf');
-    }
-
-    // Export Laporan Tagihan Excel
+    // Export Laporan Tagihan Excel - VERSI RINGKAS
     public function exportTagihanExcel($tahun)
     {
         $dataTagihan = $this->getLaporanTagihan($tahun);
@@ -388,24 +386,5 @@ class LaporanController extends Controller
                 return 'Laporan Pengeluaran ' . $this->tahun;
             }
         }, 'laporan-pengeluaran-' . $tahun . '.xlsx');
-    }
-
-    // Export Laporan Pengeluaran PDF
-    public function exportPengeluaranPdf($tahun)
-    {
-        $pengeluaran = Pengeluaran::with('admin')
-            ->whereYear('tanggal', $tahun)
-            ->orderBy('tanggal', 'desc')
-            ->get();
-
-        $totalPengeluaran = $pengeluaran->sum('jumlah');
-
-        $pdf = Pdf::loadView('admin.laporan.export-pengeluaran-pdf', [
-            'pengeluaran' => $pengeluaran,
-            'totalPengeluaran' => $totalPengeluaran,
-            'tahun' => $tahun
-        ])->setPaper('a4', 'portrait');
-
-        return $pdf->download('laporan-pengeluaran-' . $tahun . '.pdf');
     }
 }

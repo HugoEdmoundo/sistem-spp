@@ -1,4 +1,4 @@
-{{-- resources/views/admin/laporan/index.blade.php --}}
+<!-- resources/views/admin/laporan/index.blade.php -->
 @extends('layouts.app')
 
 @section('title', 'Laporan Keuangan')
@@ -15,9 +15,6 @@
                 <h4 class="mb-0 fw-bold">Laporan Keuangan</h4>
                 <p class="text-muted mb-0">Laporan SPP, Tagihan, dan Pengeluaran</p>
             </div>
-        </div>
-        <div class="text-end">
-            <small class="text-muted">{{ now()->translatedFormat('l, d F Y') }}</small>
         </div>
     </div>
 
@@ -74,110 +71,42 @@
                 </div>
                 <div class="card-body">
                     @if(is_array($dataSpp) && count($dataSpp) > 0)
-                        @foreach($dataSpp as $dataMurid)
-                        <div class="mb-5">
-                            <!-- Header Murid -->
-                            <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded">
-                                <div>
-                                    <h6 class="mb-1 fw-bold text-primary">{{ $dataMurid['murid']->nama }}</h6>
-                                    <small class="text-muted">{{ $dataMurid['murid']->email }} | {{ $dataMurid['murid']->username }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <small class="text-muted">Total SPP Tahun {{ $tahun }}</small>
-                                    <div class="fw-bold text-success">
-                                        Rp {{ number_format(collect($dataMurid['bulan'])->sum('total_dibayar'), 0, ',', '.') }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Tabel Bulan SPP -->
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-hover mb-4">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th width="10%" class="text-center">Bulan</th>
-                                            <th width="15%" class="text-center">Status</th>
-                                            <th width="15%" class="text-center">Total Dibayar</th>
-                                            <th width="15%" class="text-center">Jenis Bayar</th>
-                                            <th width="45%">Detail Pembayaran</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($dataMurid['bulan'] as $bulan => $dataBulan)
-                                        <tr>
-                                            <td class="text-center fw-semibold">
-                                                {{ $dataBulan['nama_bulan'] }}
-                                            </td>
-                                            <td class="text-center">
-                                                @if($dataBulan['status'] === 'LUNAS')
-                                                    <span class="badge bg-success">LUNAS</span>
-                                                @elseif($dataBulan['status'] === 'CICILAN')
-                                                    <span class="badge bg-warning">CICILAN</span>
-                                                @else
-                                                    <span class="badge bg-secondary">BELUM BAYAR</span>
-                                                @endif
-                                            </td>
-                                            <td class="text-center fw-bold 
-                                                @if($dataBulan['total_dibayar'] > 0) text-success @else text-muted @endif">
-                                                Rp {{ number_format($dataBulan['total_dibayar'], 0, ',', '.') }}
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge 
-                                                    @if($dataBulan['jenis_bayar'] === 'lunas') bg-success
-                                                    @elseif($dataBulan['jenis_bayar'] === 'cicilan') bg-warning
-                                                    @else bg-secondary @endif">
-                                                    {{ $dataBulan['jenis_bayar'] ?? 'BELUM BAYAR' }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                @if(count($dataBulan['pembayaran']) > 0)
-                                                    <div class="small">
-                                                        @foreach($dataBulan['pembayaran'] as $pembayaran)
-                                                        <div class="mb-1">
-                                                            @php
-                                                                $rangeBulan = $pembayaran->bulan_mulai == $pembayaran->bulan_akhir ? 
-                                                                    $dataBulan['nama_bulan'] : 
-                                                                    getNamaBulan($pembayaran->bulan_mulai) . ' - ' . getNamaBulan($pembayaran->bulan_akhir);
-                                                            @endphp
-                                                            <span class="badge bg-success me-1">SPP {{ $rangeBulan }}</span>
-                                                            <span>Rp {{ number_format($pembayaran->jumlah, 0, ',', '.') }}</span>
-                                                            <small class="text-muted">({{ $pembayaran->metode }})</small>
-                                                            @if($pembayaran->tagihan_id)
-                                                                <small class="text-info">Via Tagihan</small>
-                                                            @endif
-                                                        </div>
-                                                        @endforeach
-                                                    </div>
-                                                @else
-                                                    <span class="text-muted">Belum ada pembayaran</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                    <tfoot class="table-group-divider">
-                                        <tr class="fw-bold bg-light">
-                                            <td class="text-center">TOTAL</td>
-                                            <td class="text-center">
-                                                @php
-                                                    $bulanLunas = collect($dataMurid['bulan'])->where('status', 'LUNAS')->count();
-                                                    $bulanCicilan = collect($dataMurid['bulan'])->where('status', 'CICILAN')->count();
-                                                    $bulanBelum = collect($dataMurid['bulan'])->where('status', 'BELUM BAYAR')->count();
-                                                @endphp
-                                                <small>Lunas: {{ $bulanLunas }}, Cicilan: {{ $bulanCicilan }}, Belum: {{ $bulanBelum }}</small>
-                                            </td>
-                                            <td class="text-center text-success">
-                                                Rp {{ number_format(collect($dataMurid['bulan'])->sum('total_dibayar'), 0, ',', '.') }}
-                                            </td>
-                                            <td></td>
-                                            <td></td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
+                        <!-- Tampilkan data SPP yang sudah dipisah -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nama Siswa</th>
+                                        @for($i = 1; $i <= 12; $i++)
+                                        <th class="text-center">{{ \App\Models\User::getNamaBulanStatic($i) }}</th>
+                                        @endfor
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($dataSpp as $dataMurid)
+                                    <tr>
+                                        <td class="fw-bold">{{ $dataMurid['murid']->nama }}</td>
+                                        @for($i = 1; $i <= 12; $i++)
+                                        <td class="text-center">
+                                            @php $bulanData = $dataMurid['bulan'][$i]; @endphp
+                                            @if($bulanData['status'] === 'LUNAS')
+                                                <span class="badge bg-success">LUNAS</span>
+                                            @elseif($bulanData['status'] === 'CICILAN')
+                                                <span class="badge bg-warning">CICILAN</span>
+                                            @else
+                                                <span class="badge bg-secondary">BELUM</span>
+                                            @endif
+                                            <br>
+                                            <small class="text-muted">
+                                                Rp {{ number_format($bulanData['total_dibayar'], 0, ',', '.') }}
+                                            </small>
+                                        </td>
+                                        @endfor
+                                    </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
-                        <hr class="my-4">
-                        @endforeach
                     @else
                     <div class="text-center py-5">
                         <div class="mb-3">
@@ -208,33 +137,35 @@
                                title="Export Excel">
                                 <i class="bi bi-file-earmark-excel text-success me-1"></i> Excel
                             </a>
+                            <a href="{{ route('admin.laporan.export.tagihan.pdf', $tahun) }}" 
+                               class="btn btn-light btn-sm" 
+                               title="Export PDF">
+                                <i class="bi bi-file-earmark-pdf text-danger me-1"></i> PDF
+                            </a>
                         </div>
                     </div>
                 </div>
                 <div class="card-body">
                     @if(isset($dataTagihan) && $dataTagihan->count() > 0)
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover" id="tableTagihan">
+                        <table class="table table-bordered table-hover">
                             <thead class="table-light">
                                 <tr>
-                                    <th width="5%" class="text-center">No</th>
-                                    <th width="20%">Nama Siswa</th>
-                                    <th width="15%">Jenis Tagihan</th>
-                                    <th width="25%">Keterangan</th>
-                                    <th width="10%" class="text-end">Total Tagihan</th>
-                                    <th width="10%" class="text-end">Dibayar</th>
-                                    <th width="10%" class="text-end">Sisa</th>
-                                    <th width="5%" class="text-center">Status</th>
+                                    <th>No</th>
+                                    <th>Nama Siswa</th>
+                                    <th>Jenis Tagihan</th>
+                                    <th>Keterangan</th>
+                                    <th class="text-end">Total Tagihan</th>
+                                    <th class="text-end">Dibayar</th>
+                                    <th class="text-end">Sisa</th>
+                                    <th class="text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($dataTagihan as $index => $tagihan)
                                 <tr>
-                                    <td class="text-center fw-semibold">{{ $index + 1 }}</td>
-                                    <td>
-                                        <div class="fw-medium text-dark">{{ $tagihan->user->nama ?? 'N/A' }}</div>
-                                        <small class="text-muted">{{ $tagihan->user->email ?? '' }}</small>
-                                    </td>
+                                    <td class="fw-semibold">{{ $index + 1 }}</td>
+                                    <td>{{ $tagihan->user->nama ?? 'N/A' }}</td>
                                     <td>
                                         <span class="badge bg-primary">{{ $tagihan->jenis }}</span>
                                     </td>
@@ -301,7 +232,7 @@
                 <div class="card-body">
                     @if(isset($pengeluaran) && $pengeluaran->count() > 0)
                     <div class="table-responsive">
-                        <table class="table table-bordered table-hover" id="tablePengeluaran">
+                        <table class="table table-bordered table-hover">
                             <thead class="table-light">
                                 <tr>
                                     <th width="5%" class="text-center">No</th>
@@ -368,14 +299,3 @@
     </div>
 </div>
 @endsection
-
-{{-- @php
-function getNamaBulan($bulan) {
-    $bulanArr = [
-        1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-        5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-        9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-    ];
-    return $bulanArr[$bulan] ?? 'Bulan ' . $bulan;
-}
-@endphp --}}

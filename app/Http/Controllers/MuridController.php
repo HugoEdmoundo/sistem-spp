@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Tagihan;
 use App\Models\Pembayaran;
 use App\Models\SppSetting;
+use App\Models\User;
 use App\Helpers\NumberHelper;
 use App\Events\PembayaranDibuat;
 use App\Mail\PembayaranNotification;
@@ -301,8 +302,13 @@ class MuridController extends Controller
 
         $user = auth()->user();
         
-        // Validasi: Cek apakah bulan sudah ada tagihan SPP yang belum lunas
-        $bulanSudahAda = $this->cekBulanSudahAdaTagihanSpp($user->id, $request->tahun, $request->bulan_mulai, $request->bulan_akhir);
+        // Validasi: Cek apakah bulan sudah ada tagihan SPP yang belum lunas - DIPERBAIKI
+        $bulanSudahAda = [];
+        for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
+            if ($user->isBulanSudahDibayar($request->tahun, $bulan)) {
+                $bulanSudahAda[] = $bulan;
+            }
+        }
         
         if (!empty($bulanSudahAda)) {
             $bulanNames = array_map(function($bulan) {
@@ -310,49 +316,47 @@ class MuridController extends Controller
             }, $bulanSudahAda);
             
             return back()->withErrors([
-                'bulan_mulai' => 'Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki tagihan SPP yang belum lunas.'
+                'bulan_mulai' => 'Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki pembayaran SPP.'
             ])->withInput();
         }
 
         try {
             DB::beginTransaction();
 
-            // Generate tagihan SPP
-            $tagihanSpp = Tagihan::generateTagihanSpp(
-                $user->id,
-                $request->tahun,
-                $request->bulan_mulai,
-                $request->bulan_akhir
-            );
-
             // Upload bukti
             $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
 
-            // Buat pembayaran untuk tagihan SPP
+            // Hitung jumlah bulan untuk menentukan jenis bayar
+            $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
+            $sppSetting = SppSetting::latest()->first();
+            $totalHarusBayar = $sppSetting ? ($sppSetting->nominal * $jumlahBulan) : 0;
+            
+            $jenisBayar = $request->jumlah >= $totalHarusBayar ? 'lunas' : 'cicilan';
+
+            // Buat pembayaran SPP murni (tanpa tagihan)
             $pembayaran = Pembayaran::create([
-                'tagihan_id' => $tagihanSpp->id,
                 'user_id' => $user->id,
                 'metode' => $request->metode,
                 'bukti' => $buktiPath,
                 'jumlah' => $request->jumlah,
                 'status' => 'pending',
                 'keterangan' => $request->keterangan,
-                'jenis_bayar' => 'cicilan',
+                'jenis_bayar' => $jenisBayar,
                 'tanggal_upload' => now(),
-                'tanggal_bayar' => now()
+                'tanggal_bayar' => now(),
+                'tahun' => $request->tahun,
+                'bulan_mulai' => $request->bulan_mulai,
+                'bulan_akhir' => $request->bulan_akhir
             ]);
-
-            // Update status tagihan menjadi pending
-            $tagihanSpp->update(['status' => 'pending']);
 
             DB::commit();
 
-            return redirect()->route('murid.tagihan.index')
-                ->with('success', 'Tagihan SPP berhasil dibuat dan bukti pembayaran diupload. Menunggu verifikasi admin.');
+            return redirect()->route('murid.pembayaran.history')
+                ->with('success', 'Pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->withErrors(['error' => 'Gagal membuat tagihan SPP: ' . $e->getMessage()])->withInput();
+            return back()->withErrors(['error' => 'Gagal membuat pembayaran SPP: ' . $e->getMessage()])->withInput();
         }
     }
 

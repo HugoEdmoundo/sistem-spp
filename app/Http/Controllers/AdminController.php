@@ -602,6 +602,7 @@ private function createPembayaranNotification($pembayaran)
             $user = User::findOrFail($request->user_id);
 
             if ($request->tipe_pembayaran == 'tagihan') {
+                // ========== PEMBAYARAN TAGIHAN ==========
                 $request->validate([
                     'tagihan_id' => 'required|exists:tagihans,id'
                 ]);
@@ -622,9 +623,9 @@ private function createPembayaranNotification($pembayaran)
                 $akanLunas = $tagihan->akanLunasDenganJumlah($request->jumlah);
                 $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
 
-                // Buat pembayaran
+                // Buat pembayaran TAGIHAN
                 $pembayaran = Pembayaran::create([
-                    'tagihan_id' => $tagihan->id,
+                    'tagihan_id' => $tagihan->id, // Ada tagihan_id untuk pembayaran tagihan
                     'user_id' => $request->user_id,
                     'metode' => $request->metode,
                     'bukti' => null, // Manual payment no bukti
@@ -636,6 +637,7 @@ private function createPembayaranNotification($pembayaran)
                     'tanggal_bayar' => $request->tanggal_bayar,
                     'tanggal_proses' => now(),
                     'admin_id' => auth()->id()
+                    // TIDAK ADA tahun, bulan_mulai, bulan_akhir untuk pembayaran tagihan
                 ]);
 
                 // Update status tagihan
@@ -646,7 +648,7 @@ private function createPembayaranNotification($pembayaran)
                 }
 
             } else {
-                // PEMBAYARAN SPP MANUAL
+                // ========== PEMBAYARAN SPP ==========
                 $request->validate([
                     'bulan_mulai' => 'required|integer|min:1|max:12',
                     'bulan_akhir' => 'required|integer|min:1|max:12',
@@ -658,52 +660,21 @@ private function createPembayaranNotification($pembayaran)
                     return back()->with('error', '❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!')->withInput();
                 }
 
-                // Cek apakah sudah ada tagihan SPP untuk periode tersebut
-                $existingTagihan = Tagihan::where('user_id', $request->user_id)
-                    ->where('jenis', 'spp')
-                    ->where('keterangan', 'like', '%' . $request->tahun . '%')
-                    ->get();
-
-                $bulanSudahAda = [];
-                foreach ($existingTagihan as $tagihan) {
-                    // Extract bulan dari keterangan
-                    preg_match_all('/\b(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\b/', $tagihan->keterangan, $matches);
-                    
-                    foreach ($matches[0] as $namaBulan) {
-                        $bulan = array_search($namaBulan, [
-                            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-                            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                        ]);
-                        if ($bulan) {
-                            $bulanSudahAda[] = $bulan;
-                        }
-                    }
-                }
-
-                // Filter bulan yang overlap dengan request
-                $bulanOverlap = [];
+                // Cek apakah sudah ada pembayaran SPP untuk periode tersebut
+                $bulanSudahBayar = [];
                 for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
-                    if (in_array($bulan, $bulanSudahAda)) {
-                        $bulanOverlap[] = $bulan;
+                    if ($user->isBulanSudahDibayar($request->tahun, $bulan)) {
+                        $bulanSudahBayar[] = $bulan;
                     }
                 }
 
-                if (!empty($bulanOverlap)) {
+                if (!empty($bulanSudahBayar)) {
                     $bulanNames = array_map(function($bulan) {
                         return User::getNamaBulanStatic($bulan);
-                    }, $bulanOverlap);
+                    }, $bulanSudahBayar);
                     
-                    return back()->with('error', '❌ Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki tagihan SPP!')->withInput();
+                    return back()->with('error', '❌ Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki pembayaran SPP!')->withInput();
                 }
-
-                // Generate tagihan SPP
-                $tagihanSpp = Tagihan::generateTagihanSpp(
-                    $request->user_id,
-                    $request->tahun,
-                    $request->bulan_mulai,
-                    $request->bulan_akhir
-                );
 
                 // Tentukan jenis bayar
                 $sppSetting = SppSetting::latest()->first();
@@ -713,9 +684,9 @@ private function createPembayaranNotification($pembayaran)
 
                 $jenisBayar = $request->jumlah >= $totalHarusBayar ? 'lunas' : 'cicilan';
 
-                // Buat pembayaran
+                // Buat pembayaran SPP MURNI (tanpa tagihan_id)
                 $pembayaran = Pembayaran::create([
-                    'tagihan_id' => $tagihanSpp->id,
+                    'tagihan_id' => null, // NULL untuk pembayaran SPP murni
                     'user_id' => $request->user_id,
                     'metode' => $request->metode,
                     'bukti' => null,
@@ -730,14 +701,10 @@ private function createPembayaranNotification($pembayaran)
                     'tahun' => $request->tahun,
                     'bulan_mulai' => $request->bulan_mulai,
                     'bulan_akhir' => $request->bulan_akhir
+                    // ADA tahun, bulan_mulai, bulan_akhir untuk pembayaran SPP
                 ]);
 
-                // Update status tagihan SPP
-                if ($jenisBayar == 'lunas') {
-                    $tagihanSpp->update(['status' => 'success']);
-                } else {
-                    $tagihanSpp->update(['status' => 'unpaid']);
-                }
+                // TIDAK membuat tagihan SPP, karena ini pembayaran SPP langsung
             }
 
             // Buat notifikasi untuk murid
