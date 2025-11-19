@@ -16,19 +16,6 @@
                 <p class="text-muted mb-0">Daftar semua pembayaran yang telah dilakukan</p>
             </div>
         </div>
-        <a href="{{ route('murid.tagihan.index') }}" class="btn btn-outline-primary">
-            <i class="bi bi-arrow-left me-2"></i>Kembali ke Tagihan
-        </a>
-    </div>
-    <!-- Bisa tambahkan di bagian atas view history jika perlu -->
-    <div class="alert alert-info mb-4">
-        <div class="d-flex align-items-center">
-            <i class="bi bi-info-circle-fill me-3 fs-4"></i>
-            <div>
-                <strong>Informasi:</strong> Untuk melanjutkan pembayaran cicilan, silakan buka menu 
-                <a href="{{ route('murid.tagihan.index') }}" class="alert-link">Tagihan Saya</a>.
-            </div>
-        </div>
     </div>
 
     <!-- Alert Section -->
@@ -36,6 +23,14 @@
         <div class="alert alert-success alert-dismissible fade show d-flex align-items-center" role="alert">
             <i class="bi bi-check-circle-fill me-2"></i>
             <div class="flex-grow-1">{{ session('success') }}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <div class="flex-grow-1">{{ session('error') }}</div>
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     @endif
@@ -163,37 +158,16 @@
                                 </div>
                             </td>
                             
-                            <!-- Aksi Column -->
+                            <!-- Aksi Column - DIUBAH SEPERTI DI ADMIN -->
                             <td class="text-center pe-4">
                                 <div class="btn-group" role="group">
-                                    <!-- Tombol Detail -->
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-info" 
+                                    <!-- Detail Button -->
+                                    <button type="button" class="btn btn-sm btn-outline-primary" 
                                             data-bs-toggle="modal" 
                                             data-bs-target="#detailModal{{ $item->id }}"
-                                            title="Lihat Detail">
-                                        <i class="bi bi-info-circle"></i>
+                                            title="Detail Pembayaran">
+                                        <i class="bi bi-eye"></i>
                                     </button>
-
-                                    <!-- Tombol Kuitansi untuk yang accepted -->
-                                    @if($item->status == 'accepted')
-                                        <a href="{{ route('murid.kuitansi.pdf', $item->id) }}" 
-                                        class="btn btn-sm btn-outline-success" 
-                                        title="Download Kuitansi"
-                                        target="_blank">
-                                            <i class="bi bi-receipt"></i>
-                                        </a>
-                                    @endif
-
-                                    <!-- Tombol Lihat Bukti -->
-                                    @if($item->bukti)
-                                        <a href="{{ asset('storage/' . $item->bukti) }}" 
-                                        class="btn btn-sm btn-outline-primary" 
-                                        title="Lihat Bukti"
-                                        target="_blank">
-                                            <i class="bi bi-eye"></i>
-                                        </a>
-                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -279,7 +253,7 @@
                                                             <div class="col-5"><small class="text-muted">Jumlah</small></div>
                                                             <div class="col-7">
                                                                 <small class="fw-bold text-primary">
-                                                                    {{ $item->jumlah_formatted }}
+                                                                    Rp {{ number_format($item->jumlah, 0, ',', '.') }}
                                                                 </small>
                                                             </div>
                                                             
@@ -300,15 +274,15 @@
                                             <div class="row">
                                                 <div class="col-md-4">
                                                     <small class="text-muted">Total Tagihan</small>
-                                                    <div class="fw-bold">{{ $item->tagihan->jumlah_formatted }}</div>
+                                                    <div class="fw-bold">Rp {{ number_format($item->tagihan->jumlah, 0, ',', '.') }}</div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <small class="text-muted">Total Dibayar</small>
-                                                    <div class="fw-bold text-success">{{ $item->tagihan->total_dibayar_formatted }}</div>
+                                                    <div class="fw-bold text-success">Rp {{ number_format($item->tagihan->total_dibayar, 0, ',', '.') }}</div>
                                                 </div>
                                                 <div class="col-md-4">
                                                     <small class="text-muted">Sisa Tagihan</small>
-                                                    <div class="fw-bold text-warning">{{ $item->tagihan->sisa_tagihan_formatted }}</div>
+                                                    <div class="fw-bold text-warning">Rp {{ number_format($item->tagihan->sisa_tagihan, 0, ',', '.') }}</div>
                                                 </div>
                                             </div>
                                             @if($item->tagihan->is_cicilan)

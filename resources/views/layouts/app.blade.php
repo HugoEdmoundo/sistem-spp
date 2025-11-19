@@ -1128,24 +1128,11 @@
                     <a class="nav-link {{ request()->routeIs('murid.tagihan.*') ? 'active' : '' }}" href="{{ route('murid.tagihan.index') }}">
                         <i class="bi bi-receipt"></i>
                         <span>Tagihan Saya</span>
-                        @php
-                            $unpaidTagihanCount = auth()->user()->tagihan()
-                                ->where('status', 'unpaid')
-                                ->count();
-                            $cicilanTagihanCount = auth()->user()->tagihan()
-                                ->where('status', '!=', 'success')
-                                ->whereHas('pembayaran', function($q) {
-                                    $q->where('status', 'accepted');
-                                })
-                                ->count();
-                            $totalNotif = $unpaidTagihanCount + $cicilanTagihanCount;
-                        @endphp
-                        @if($totalNotif > 0)
-                        <span class="nav-badge">{{ $totalNotif }}</span>
+                        @if(auth()->user()->getTotalTagihanBelumLunas() > 0)
+                        <span class="nav-badge">{{ auth()->user()->getTotalTagihanBelumLunas() }}</span>
                         @endif
                     </a>
                 </div>
-
                 <div class="nav-item">
                     <a class="nav-link {{ request()->routeIs('murid.bayar.spp.page') ? 'active' : '' }}" href="{{ route('murid.bayar.spp.page') }}">
                         <i class="bi bi-credit-card"></i>

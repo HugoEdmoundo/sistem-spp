@@ -1,475 +1,192 @@
-{{-- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KUITANSI - {{ $pembayaran->id }}</title>
+  <title>KUITANSI ADMIN - {{ $pembayaran->id }}</title>
+
   <style>
-    @page {
-      margin: 0;
-      size: A4;
+    @page { 
+      margin: 0; 
+      size: A4; 
     }
 
     body {
       font-family: "Times New Roman", serif;
-      margin: 20mm 25mm;
+      margin: 15mm 18mm;
       color: #000;
-      line-height: 1.6;
-      background: #fff;
-      height: 297mm;
-      overflow: hidden;
+      line-height: 1.4;
       position: relative;
+      font-size: 14px; /* Ukuran font dasar yang lebih besar */
     }
 
-    .container {
-      min-height: 257mm;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* === WATERMARK === */
+    /* WATERMARK */
     .watermark {
-      position: absolute;
-      top: 50%;
+      position: fixed;
+      top: 42%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-45deg);
-      font-size: 80px;
-      color: rgba(0, 0, 0, 0.05);
-      z-index: -1;
+      transform: translate(-50%, -50%) rotate(-25deg);
+      font-size: 100px; /* Sedikit lebih besar */
+      font-weight: bold;
+      color: #707070;
+      opacity: 0.08;
       white-space: nowrap;
-      font-weight: bold;
+      z-index: -1;
       pointer-events: none;
+      user-select: none;
     }
 
-    /* === JUDUL KUITANSI === */
-    .judul-kuitansi {
+    /* HEADER */
+    .header {
       text-align: center;
-      margin: 10px 0 20px 0;
+      border-bottom: 1.5px solid #333;
+      padding-bottom: 8px;
+      margin-bottom: 18px;
+    }
+    .header h1 { 
+      margin: 0; 
+      font-size: 22px; /* Sedikit lebih besar */
+      font-weight: bold; 
+    }
+    .header p { 
+      margin: 4px 0; 
+      font-size: 14px; /* Lebih besar */
     }
 
-    .judul-kuitansi h1 {
-      font-size: 22px;
+    /* INFO BOX */
+    .info-box {
+      border: 1px solid #333;
+      padding: 12px 15px;
+      margin-top: 12px;
+      background: #fafafa;
+      border-radius: 4px;
+      font-size: 14px; /* Lebih besar */
+    }
+
+    .info-box table { 
+      width: 100%; 
+    }
+
+    /* CONTENT */
+    .content { 
+      margin-top: 20px; 
+    }
+    .info-table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 14px; /* Lebih besar */
+    }
+    .info-table th {
+      width: 30%;
+      background: #f0f0f0;
+      padding: 8px 10px; /* Sedikit lebih besar */
+      text-align: left;
       font-weight: bold;
-      text-decoration: underline;
-      margin: 0 0 8px 0;
-      letter-spacing: 1px;
-      color: #2c5aa0;
+      border-bottom: 1px solid #e2e2e2;
     }
-
-    .nomor-kuitansi {
-      font-size: 14px;
-      font-weight: bold;
-      margin: 0;
-    }
-
-    /* === KONTEN KUITANSI === */
-    .konten-kuitansi {
-      margin: 20px 0;
-      flex: 1;
-    }
-
-    .info-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 15px 0;
-    }
-
     .info-table td {
-      padding: 10px 5px;
-      vertical-align: top;
-      border-bottom: 1px solid #f0f0f0;
+      padding: 8px 10px; /* Sedikit lebih besar */
+      border-bottom: 1px solid #ececec;
     }
 
-    .info-table tr:last-child td {
-      border-bottom: none;
-    }
-
-    .label {
-      width: 35%;
-      font-weight: bold;
-      color: #333;
-    }
-
-    .value {
-      width: 65%;
-      color: #000;
-    }
-
-    /* === JUMLAH PEMBAYARAN === */
+    /* JUMLAH */
     .jumlah-section {
       text-align: center;
-      margin: 25px 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #f0f5ff 0%, #e1ebff 100%);
-      border: 2px solid #2c5aa0;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin: 30px 0 25px 0; /* Sedikit lebih besar */
     }
-
-    .jumlah-label {
-      font-size: 18px;
+    .jumlah-section .nominal {
+      font-size: 26px; /* Sedikit lebih besar */
       font-weight: bold;
-      margin-bottom: 10px;
-      color: #2c5aa0;
+      margin-top: 5px;
     }
 
-    .jumlah-nominal {
-      font-size: 24px;
-      font-weight: bold;
-      margin: 0;
-      color: #2c5aa0;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
-    }
-
-    /* === TERBILANG === */
-    .terbilang {
-      background: #f0f5ff;
-      border-left: 5px solid #2c5aa0;
-      padding: 15px;
-      margin: 20px 0;
-      font-style: italic;
-      border-radius: 0 5px 5px 0;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-
-    .terbilang strong {
-      color: #2c5aa0;
-    }
-
-    /* === TANDA TANGAN & BARCODE === */
-    .ttd-barcode-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-top: 50px;
-      gap: 30px;
-    }
-
-    .barcode-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .ttd-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .ttd-wrapper {
-      flex: 2;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 60px;
-      margin-top: 20px;
-    }
-
-    .ttd-box {
-      flex: 1;
+    /* TTD */
+    .ttd-center {
       text-align: center;
+      margin-top: 40px; /* Sedikit lebih besar */
     }
-
-    .barcode-container {
-      background: #f9f9f9;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      padding: 15px;
-      margin: 10px 0;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    .qr-ttd {
+      width: 130px; /* Sedikit lebih besar */
+      margin-bottom: 12px;
     }
-
-    .barcode {
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      letter-spacing: 2px;
-      margin: 0;
-      padding: 8px 0;
-      text-align: center;
-      background: #fff;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      font-weight: bold;
-    }
-
-    .barcode-info {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      margin-top: 8px;
-      line-height: 1.4;
-      color: #666;
-      gap: 10px;
-    }
-
-    .barcode-info-item {
-      flex: 1;
-    }
-
     .ttd-line {
+      width: 200px; /* Sedikit lebih besar */
       border-top: 2px solid #000;
-      width: 180px;
-      margin: 40px auto 8px auto;
+      margin: 40px auto 8px auto; /* Sedikit lebih besar */
     }
-
     .nama-ttd {
       font-weight: bold;
-      margin-top: 8px;
-      font-size: 14px;
+      font-size: 14px; /* Lebih besar */
     }
 
-    .jabatan {
-      font-size: 12px;
-      color: #666;
-      margin-top: 3px;
-    }
-
-    .ttd-image {
-      width: 80px;
-      height: 80px;
-      margin: 10px auto;
-      display: block;
-      object-fit: contain;
-    }
-
-    /* === FOOTER === */
+    /* FOOTER */
     .footer {
       text-align: center;
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 1px solid #ddd;
-      font-size: 10px;
-      color: #666;
-      line-height: 1.4;
-    }
-
-    /* === PRINT STYLES === */
-    @media print {
-      body {
-        margin: 20mm 25mm;
-        height: 297mm;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-      }
-      .no-print {
-        display: none !important;
-      }
-      .jumlah-section {
-        background: #f0f5ff !important;
-        -webkit-print-color-adjust: exact;
-      }
-      .terbilang {
-        background: #f0f5ff !important;
-        -webkit-print-color-adjust: exact;
-      }
-      .barcode-container {
-        box-shadow: none;
-      }
-    }
-
-    /* === RESPONSIVE === */
-    @media (max-width: 768px) {
-      body {
-        margin: 15mm;
-      }
-      .ttd-wrapper {
-        flex-direction: column;
-        gap: 30px;
-      }
-      .barcode-info {
-        flex-direction: column;
-      }
+      margin-top: 35px; /* Sedikit lebih besar */
+      font-size: 12px; /* Lebih besar */
+      color: #555;
+      border-top: 1px solid #ccc;
+      padding-top: 8px;
     }
   </style>
 </head>
 
 <body>
-  <!-- WATERMARK -->
-  <div class="watermark">KUITANSI RESMI</div>
 
-  <div class="container">
-    <!-- === JUDUL KUITANSI === -->
-    <div class="judul-kuitansi">
-      <h1>KUITANSI PEMBAYARAN</h1>
-      <p class="nomor-kuitansi">
-        Nomor: {{ sprintf('%04d', $pembayaran->id) }}/KUIT/AR-RAHMAN/{{ now()->format('Y') }}
-      </p>
+  <!-- WATERMARK ADMIN -->
+  <div class="watermark">INTERNAL USE ONLY</div>
+
+  <!-- HEADER -->
+  <div class="header">
+    <h1>KUITANSI PEMBAYARAN (ADMIN)</h1>
+    <p>Dokumen Internal | Osman Course</p>
+  </div>
+
+  <!-- INFOBOX -->
+  <div class="info-box">
+    <table>
+      <tr><td><strong>No. Kuitansi</strong></td><td>: KTN/{{ $pembayaran->id }}/{{ now()->format('Ym') }}</td></tr>
+      <tr><td><strong>Tanggal</strong></td><td>: {{ $tanggal_sekarang }}</td></tr>
+      <tr><td><strong>Jam</strong></td><td>: {{ $jam_sekarang }}</td></tr>
+      <tr><td><strong>ID Pembayaran</strong></td><td>: {{ $pembayaran->id }}</td></tr>
+      <tr><td><strong>Admin Input</strong></td><td>: {{ $pembayaran->admin->nama ?? 'Administrasi' }}</td></tr>
+    </table>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+    <table class="info-table">
+      <tr><th>Nama Murid</th><td>{{ $pembayaran->user->nama }}</td></tr>
+      <tr><th>Email Murid</th><td>{{ $pembayaran->user->email }}</td></tr>
+      <tr><th>Keterangan</th><td>{{ $pembayaran->keterangan }}</td></tr>
+      @if($pembayaran->range_bulan)
+      <tr><th>Periode</th><td>{{ $pembayaran->range_bulan }}</td></tr>
+      @endif
+      <tr><th>Metode Pembayaran</th><td>{{ $pembayaran->metode }}</td></tr>
+      <tr><th>Status</th><td>{{ strtoupper($pembayaran->jenis_bayar) }}</td></tr>
+    </table>
+
+    <div class="jumlah-section">
+      <div>Jumlah Pembayaran</div>
+      <div class="nominal">Rp {{ number_format($pembayaran->jumlah,0,',','.') }}</div>
     </div>
 
-    <!-- === KONTEN KUITANSI === -->
-    <div class="konten-kuitansi">
-      <table class="info-table">
-        <tr>
-          <td class="label">Telah diterima dari</td>
-          <td class="value">: <strong>{{ $pembayaran->user->nama }}</strong></td>
-        </tr>
-        <tr>
-          <td class="label">NIS</td>
-          <td class="value">: {{ $pembayaran->user->username }}</td>
-        </tr>
-        <tr>
-          <td class="label">Untuk pembayaran</td>
-          <td class="value">:
-            @if($pembayaran->tagihan_id)
-              <strong>{{ $pembayaran->tagihan->keterangan ?? 'Tagihan Sekolah' }}</strong>
-            @else
-              <strong>SPP {{ $pembayaran->keterangan }}</strong>
-              @if($pembayaran->bulan_mulai && $pembayaran->bulan_akhir)
-                (Periode: {{ getNamaBulan($pembayaran->bulan_mulai) }} - {{ getNamaBulan($pembayaran->bulan_akhir) }} {{ $pembayaran->tahun }})
-              @endif
-            @endif
-          </td>
-        </tr>
-        <tr>
-          <td class="label">Metode Pembayaran</td>
-          <td class="value">: {{ ucfirst($pembayaran->metode) }}</td>
-        </tr>
-        <tr>
-          <td class="label">Tanggal Pembayaran</td>
-          <td class="value">: {{ $pembayaran->tanggal_upload->format('d F Y') }}</td>
-        </tr>
-        <tr>
-          <td class="label">Tanggal Verifikasi</td>
-          <td class="value">: {{ $pembayaran->tanggal_proses->format('d F Y') }}</td>
-        </tr>
-      </table>
-
-      <div class="jumlah-section">
-        <div class="jumlah-label">JUMLAH PEMBAYARAN</div>
-        <div class="jumlah-nominal">Rp {{ number_format($pembayaran->jumlah, 0, ',', '.') }}</div>
-      </div>
-
-      <div class="terbilang">
-        <strong>Terbilang:</strong> # {{ terbilang_sederhana($pembayaran->jumlah) }} Rupiah #
-      </div>
-    </div>
-
-    <!-- === TANDA TANGAN & BARCODE === -->
-    <div class="ttd-barcode-container">
-      <!-- BARCODE SECTION -->
-      <div class="barcode-section">
-        <p style="margin-bottom: 12px; font-weight: bold; font-size: 14px;">Kode Verifikasi Dokumen:</p>
-        <div class="barcode-container">
-          <div class="barcode">*AR{{ sprintf('%06d', $pembayaran->id) }}{{ now()->format('md') }}*</div>
-          <div class="barcode-info">
-            <div class="barcode-info-item">ID Transaksi: {{ $pembayaran->id }}</div>
-            <div class="barcode-info-item">Tanggal: {{ $pembayaran->tanggal_proses->format('d/m/Y') }}</div>
-            <div class="barcode-info-item">Status: TERVERIFIKASI</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TANDA TANGAN SECTION -->
-      <div class="ttd-section">
-        <p style="margin-bottom: 5px; text-align: right;">Bekasi, {{ $pembayaran->tanggal_proses->format('d F Y') }}</p>
-        <p style="margin-bottom: 25px; font-weight: bold; text-align: right;">Mengetahui,</p>
-
-        <div class="ttd-wrapper">
-
-          <!-- ADMINISTRATOR - KANAN -->
-          <div class="ttd-box">
-            <img src="https://res.cloudinary.com/dunynusuh/image/upload/v1761883622/barcode_ttg_admin_krwhcb.png"
-                 alt="Tanda Tangan Administrator" class="ttd-image">
-            <div class="ttd-line"></div>
-            <div class="nama-ttd">{{ $pembayaran->admin->nama ?? 'Administrasi' }}</div>
-            <div class="jabatan">Administrator</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- === FOOTER === -->
-    <div class="footer">
-      Kuitansi ini merupakan bukti pembayaran yang sah dan telah diverifikasi sistem.<br>
-      Dicetak otomatis pada: {{ $tanggal_sekarang }} pukul {{ $jam_sekarang }}
+    <div style="font-size:14px;">
+      <strong>Terbilang:</strong> {{ \App\Helpers\Terbilang::make($pembayaran->jumlah) }} Rupiah
     </div>
   </div>
-</body>
-</html> --}}
 
+  <!-- TTD -->
+  <div class="ttd-center">
+    <img src="https://res.cloudinary.com/dunynusuh/image/upload/v1761883622/barcode_ttg_admin_krwhcb.png" class="qr-ttd">
+    <div class="ttd-line"></div>
+    <div class="nama-ttd">{{ $pembayaran->admin->nama ?? 'Administrasi' }}</div>
+    <div style="font-size: 14px;">Admin Osman Course</div>
+  </div>
 
+  <!-- FOOTER -->
+  <div class="footer">
+    Dokumen internal Osman Course | Dicetak: {{ $tanggal_sekarang }} {{ $jam_sekarang }}
+  </div>
 
-
-<!-- resources/views/admin/kuitansi-pdf.blade.php -->
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Kuitansi Pembayaran</title>
-    <style>
-        body { font-family: 'Times New Roman', serif; }
-        .header { text-align: center; margin-bottom: 20px; }
-        .content { margin: 20px 0; }
-        .footer { margin-top: 30px; }
-        .table-detail { width: 100%; border-collapse: collapse; }
-        .table-detail td { padding: 8px; border: 1px solid #000; }
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-        .terbilang { font-style: italic; margin: 10px 0; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2>KUITANSI PEMBAYARAN</h2>
-        <h3>SEKOLAH MENENGAH PERTAMA</h3>
-        <p>Jl. Contoh No. 123, Kota Contoh</p>
-        <hr>
-    </div>
-
-    <div class="content">
-        <table class="table-detail">
-            <tr>
-                <td width="30%">Telah Terima Dari</td>
-                <td>: {{ $pembayaran->user->nama }}</td>
-            </tr>
-            <tr>
-                <td>Untuk Pembayaran</td>
-                <td>: {{ $pembayaran->keterangan }}</td>
-            </tr>
-            <tr>
-                <td>Jumlah</td>
-                <td>: <strong>{{ $pembayaran->jumlah_formatted }}</strong></td>
-            </tr>
-            @if($pembayaran->isCicilan() && $pembayaran->tagihan)
-            <tr>
-                <td>Jenis Pembayaran</td>
-                <td>: <strong>CICILAN</strong></td>
-            </tr>
-            <tr>
-                <td>Total Tagihan</td>
-                <td>: {{ $pembayaran->tagihan->jumlah_formatted }}</td>
-            </tr>
-            <tr>
-                <td>Total Dibayar</td>
-                <td>: {{ $pembayaran->tagihan->total_dibayar_formatted }}</td>
-            </tr>
-            <tr>
-                <td>Sisa Tagihan</td>
-                <td>: <strong>{{ $pembayaran->tagihan->sisa_tagihan_formatted }}</strong></td>
-            </tr>
-            @endif
-            <tr>
-                <td>Metode Pembayaran</td>
-                <td>: {{ $pembayaran->metode }}</td>
-            </tr>
-            <tr>
-                <td>Terbilang</td>
-                <td>: <em>{{ terbilang($pembayaran->jumlah) }} Rupiah</em></td>
-            </tr>
-        </table>
-    </div>
-
-    <div class="footer">
-        <div style="float: right; text-align: center;">
-            <p>Kota Contoh, {{ $tanggal_sekarang }}</p>
-            <br><br><br>
-            <p><strong>{{ $pembayaran->admin ? $pembayaran->admin->nama : 'Admin' }}</strong></p>
-            <p>Admin Sekolah</p>
-        </div>
-        <div style="clear: both;"></div>
-    </div>
 </body>
 </html>

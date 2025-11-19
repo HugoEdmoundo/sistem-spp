@@ -482,6 +482,31 @@ class User extends Authenticatable
         ];
     }
 
+    // Di app/Models/User.php - tambahkan method ini
+    public function getTotalTagihanBelumLunas()
+    {
+        // Tagihan biasa yang belum lunas
+        $tagihanBelumLunas = $this->tagihan()
+            ->whereIn('status', ['unpaid', 'pending'])
+            ->count();
+        
+        // SPP yang belum lunas
+        $sppBelumLunas = $this->pembayaran()
+            ->whereNull('tagihan_id')
+            ->whereNotNull('tahun')
+            ->where(function($query) {
+                $query->whereIn('status', ['pending', 'rejected'])
+                    ->orWhere('jenis_bayar', 'cicilan');
+            })
+            ->where(function($query) {
+                $query->where('status', '!=', 'accepted')
+                    ->orWhere('jenis_bayar', '!=', 'lunas');
+            })
+            ->count();
+        
+        return $tagihanBelumLunas + $sppBelumLunas;
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

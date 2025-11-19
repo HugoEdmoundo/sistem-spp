@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Tagihan;
@@ -14,12 +15,16 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Traits\TahunTrait; // ← ADD THIS
+use App\Traits\TahunTrait;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Exception;
+use Illuminate\Support\Collection;
 
 class MuridController extends Controller
 {
-    use TahunTrait; // ← ADD THIS
-   public function dashboard()
+    use TahunTrait;
+
+    public function dashboard()
     {   
         $user = auth()->user();
         
@@ -35,7 +40,7 @@ class MuridController extends Controller
         $tagihanPartialCount = Tagihan::where('user_id', $user->id)
             ->where('status', 'partial')
             ->count();
-            
+
         $totalTagihanNotif = $tagihanUnpaidCount + $tagihanPartialCount;
 
         // Hitung statistik PEMBAYARAN
@@ -52,7 +57,8 @@ class MuridController extends Controller
             ->count();
 
         $pembayaranPartialCount = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'partial')
+            ->where('status', 'accepted')
+            ->where('jenis_bayar', 'cicilan')
             ->count();
 
         // Total notifikasi
@@ -74,6 +80,24 @@ class MuridController extends Controller
             ->take(5)
             ->get();
 
+        // Ambil SPP cicilan
+        $sppCicilanPayments = Pembayaran::where('user_id', $user->id)
+            ->whereNull('tagihan_id')
+            ->where('status', 'accepted')
+            ->where('jenis_bayar', 'cicilan')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        // Buat array sederhana untuk SPP cicilan
+        $sppCicilanArray = [];
+        foreach ($sppCicilanPayments as $sppPayment) {
+            $sppAsTagihan = $this->createSimpleVirtualTagihan($sppPayment);
+            if ($sppAsTagihan && ($sppAsTagihan['is_cicilan'] ?? false)) {
+                $sppCicilanArray[] = $sppAsTagihan;
+            }
+        }
+
         $pembayaranPending = Pembayaran::where('user_id', $user->id)
             ->where('status', 'pending')
             ->latest()
@@ -86,12 +110,21 @@ class MuridController extends Controller
             ->take(5)
             ->get();
 
-        $pembayaranPartial = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'partial')
-            ->with('tagihan')
-            ->latest()
-            ->take(5)
-            ->get();
+        // Gabungkan dengan cara manual
+        $allCicilan = collect();
+        
+        // Tambahkan tagihan partial biasa
+        foreach ($tagihanPartial as $tagihan) {
+            $allCicilan->push($tagihan);
+        }
+        
+        // Tambahkan SPP cicilan
+        foreach ($sppCicilanArray as $sppCicilan) {
+            $allCicilan->push((object)$sppCicilan);
+        }
+        
+        // Ambil 5 teratas
+        $allCicilan = $allCicilan->take(5);
 
         // Ambil nominal SPP saat ini
         $sppSetting = SppSetting::latest()->first();
@@ -103,33 +136,115 @@ class MuridController extends Controller
             ->take(5)
             ->get();
 
+        // Ambil tagihan untuk section tagihan terbaru
+        $tagihanTerbaru = Tagihan::where('user_id', $user->id)
+            ->latest()
+            ->take(5)
+            ->get();
+
         return view('murid.dashboard', [
             'totalTagihan' => $totalTagihan,
             'totalDibayar' => $totalDibayar,
             'tagihanUnpaidCount' => $tagihanUnpaidCount,
-            'tagihanPartialCount' => $tagihanPartialCount,
+            'tagihanPartialCount' => $tagihanPartialCount + count($sppCicilanArray),
             'totalTagihanNotif' => $totalTagihanNotif,
             'pembayaranPendingCount' => $pembayaranPendingCount,
             'pembayaranRejectedCount' => $pembayaranRejectedCount,
             'pembayaranPartialCount' => $pembayaranPartialCount,
             'totalNotifikasi' => $totalNotifikasi,
             'tagihanUnpaid' => $tagihanUnpaid,
-            'tagihanPartial' => $tagihanPartial,
+            'tagihanPartial' => $allCicilan,
             'pembayaranPending' => $pembayaranPending,
             'pembayaranRejected' => $pembayaranRejected,
-            'pembayaranPartial' => $pembayaranPartial,
             'nominalSpp' => $nominalSpp,
-            'riwayatPembayaran' => $riwayatPembayaran
+            'riwayatPembayaran' => $riwayatPembayaran,
+            'tagihanTerbaru' => $tagihanTerbaru
         ]);
     }
 
-    // METHOD REKAP SPP YANG DIPERLUKAN
+    private function createSimpleVirtualTagihan($sppPayment)
+    {
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        
+        $bulanMulai = $sppPayment->bulan_mulai;
+        $bulanAkhir = $sppPayment->bulan_akhir;
+        $tahun = $sppPayment->tahun;
+        
+        if (!$bulanMulai || !$bulanAkhir) {
+            return null;
+        }
+
+        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+        $totalTagihan = $nominalSpp * $jumlahBulan;
+        
+        // Hitung total sudah dibayar untuk SPP periode ini
+        $totalDibayar = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'accepted')
+            ->sum('jumlah');
+
+        $sisaTagihan = $totalTagihan - $totalDibayar;
+        
+        // Status berdasarkan kondisi aktual
+        $isLunas = $sisaTagihan <= 0;
+        $isPending = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'pending')
+            ->exists();
+            
+        $isRejected = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'rejected')
+            ->exists();
+            
+        $isCicilan = $totalDibayar > 0 && $totalDibayar < $totalTagihan;
+        $bisaBayar = $sisaTagihan > 0 && !$isPending;
+
+        $persentaseDibayar = $totalTagihan > 0 ? ($totalDibayar / $totalTagihan) * 100 : 0;
+        $minimalBayar = max(1000, $sisaTagihan * 0.1);
+        
+        // Return array sederhana
+        return [
+            'id' => 'spp_' . $sppPayment->id,
+            'jenis' => 'spp',
+            'keterangan' => 'SPP ' . $jumlahBulan . ' bulan (' . 
+                User::getNamaBulanStatic($bulanMulai) . ' - ' . 
+                User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun . ')',
+            'jumlah' => $totalTagihan,
+            'status' => $isLunas ? 'success' : ($isRejected ? 'rejected' : 'unpaid'),
+            'created_at' => $sppPayment->created_at,
+            'is_virtual' => true,
+            'total_dibayar' => $totalDibayar,
+            'sisa_tagihan' => $sisaTagihan,
+            'persentase_dibayar' => $persentaseDibayar,
+            'is_lunas' => $isLunas,
+            'is_pending' => $isPending,
+            'is_cicilan' => $isCicilan,
+            'is_rejected' => $isRejected,
+            'bisa_bayar' => $bisaBayar,
+            'minimal_bayar' => $minimalBayar,
+            'jumlah_formatted' => 'Rp ' . number_format($totalTagihan, 0, ',', '.'),
+            'total_dibayar_formatted' => 'Rp ' . number_format($totalDibayar, 0, ',', '.'),
+            'sisa_tagihan_formatted' => 'Rp ' . number_format($sisaTagihan, 0, ',', '.')
+        ];
+    }
+
     public function rekapSppSaya()
     {
         $user = auth()->user();
         $tahun = request('tahun', $this->getTahunSekarang());
         
-        // GUNAKAN TRAIT METHOD
+        // Gunakan trait method
         $tahunTersedia = $this->getTahunTersedia($user->id);
         
         $statusSpp = $user->getStatusSppTahunan($tahun);
@@ -142,58 +257,71 @@ class MuridController extends Controller
         ));
     }
     
-    // METHOD GENERATE KUITANSI YANG DIPERLUKAN
     public function generateKuitansi($pembayaranId)
-{
-    try {
-        $pembayaran = Pembayaran::where('user_id', auth()->id())
-            ->with(['user', 'admin', 'tagihan'])
-            ->findOrFail($pembayaranId);
+    {
+        try {
+            $pembayaran = Pembayaran::where('user_id', auth()->id())
+                ->with(['user', 'admin', 'tagihan'])
+                ->findOrFail($pembayaranId);
 
-        if ($pembayaran->status !== 'accepted') {
+            if ($pembayaran->status !== 'accepted') {
+                return redirect()->route('murid.pembayaran.history')
+                    ->with('error', '❌ Kuitansi hanya bisa diunduh untuk pembayaran yang sudah diterima.');
+            }
+
+            $data = [
+                'pembayaran' => $pembayaran,
+                'tanggal_sekarang' => now()->format('d F Y'),
+                'jam_sekarang' => now()->format('H:i:s'),
+            ];
+
+            // Generate PDF dengan setting yang lebih kompatibel
+            $pdf = Pdf::loadView('murid.kuitansi-pdf', $data)
+                ->setPaper('a4', 'portrait')
+                ->setOptions([
+                    'defaultFont' => 'Times New Roman',
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                    'isPhpEnabled' => true,
+                    'chroot' => public_path(),
+                    'dpi' => 150,
+                    'fontHeightRatio' => 0.9,
+                    'enable_font_subsetting' => true
+                ]);
+            
+            $filename = 'Kuitansi-' . $pembayaran->user->nama . '-' . now()->format('Y-m-d') . '.pdf';
+            
+            // Coba beberapa cara download
+            try {
+                return $pdf->download($filename);
+            } catch (Exception $e) {
+                // Fallback: return sebagai stream
+                return response($pdf->output(), 200)
+                    ->header('Content-Type', 'application/pdf')
+                    ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+                    ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+                    ->header('Pragma', 'no-cache')
+                    ->header('Expires', '0');
+            }
+
+        } catch (Exception $e) {
+            \Log::error('Error generating kuitansi: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            
             return redirect()->route('murid.pembayaran.history')
-                ->with('error', '❌ Kuitansi hanya bisa diunduh untuk pembayaran yang sudah diterima.');
+                ->with('error', '❌ Gagal generate kuitansi: ' . $e->getMessage());
         }
-
-        $data = [
-            'pembayaran' => $pembayaran,
-            'tanggal_sekarang' => now()->format('d F Y'),
-            'jam_sekarang' => now()->format('H:i:s'),
-        ];
-
-        // Generate PDF dengan setting A4
-        $pdf = Pdf::loadView('murid.kuitansi-pdf', $data)
-            ->setPaper('a4', 'portrait')
-            ->setOptions([
-                'defaultFont' => 'Times New Roman',
-                'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => true,
-                'chroot' => public_path(),
-                'dpi' => 150
-            ]);
-        
-        $filename = 'Kuitansi-' . $pembayaran->user->nama . '-' . now()->format('Y-m-d') . '.pdf';
-        
-        return $pdf->download($filename);
-
-    } catch (\Exception $e) {
-        \Log::error('Error generating kuitansi: ' . $e->getMessage());
-        return redirect()->route('murid.pembayaran.history')
-            ->with('error', '❌ Gagal generate kuitansi. Silakan coba lagi.');
     }
-}
 
-    // Tambahkan method helper untuk terbilang
     private function terbilang($angka)
     {
         return $this->convertToTerbilang($angka);
     }
 
-    // Method konversi angka ke terbilang
     private function convertToTerbilang($angka) 
     {
         $angka = abs($angka);
-        $bilangan = array('', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas');
+        $bilangan = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
         
         if ($angka < 12) {
             return $bilangan[$angka];
@@ -223,29 +351,184 @@ class MuridController extends Controller
         
         return 'Angka terlalu besar';
     }
-    // METHOD TAGIHAN INDEX YANG DIPERLUKAN
+
+    public function getVirtualTagihanAttributes($virtualTagihan)
+    {
+        $isLunas = $virtualTagihan->status === 'success';
+        $isPending = $virtualTagihan->pembayaran->first()->status === 'pending';
+        $isCicilan = $virtualTagihan->pembayaran->first()->jenis_bayar === 'cicilan';
+        $bisaBayar = !$isLunas;
+        
+        return [
+            'is_lunas' => $isLunas,
+            'is_pending' => $isPending,
+            'is_cicilan' => $isCicilan,
+            'jumlah_formatted' => 'Rp ' . number_format($virtualTagihan->jumlah, 0, ',', '.'),
+            'total_dibayar_formatted' => 'Rp ' . number_format($virtualTagihan->total_dibayar, 0, ',', '.'),
+            'sisa_tagihan_formatted' => 'Rp ' . number_format($virtualTagihan->sisa_tagihan, 0, ',', '.'),
+            'bisa_bayar' => $bisaBayar,
+            'minimal_bayar' => max(1000, $virtualTagihan->sisa_tagihan * 0.1),
+            'persentase_dibayar' => $virtualTagihan->jumlah > 0 ? ($virtualTagihan->total_dibayar / $virtualTagihan->jumlah) * 100 : 0
+        ];
+    }
+
     public function tagihanIndex()
     {
         $user = auth()->user();
         
-        $query = Tagihan::where('user_id', $user->id)
+        // 1. Ambil tagihan biasa (non-SPP) yang belum lunas
+        $tagihanQuery = Tagihan::where('user_id', $user->id)
             ->with(['pembayaran' => function($query) {
                 $query->whereIn('status', ['accepted', 'pending', 'rejected']);
-            }]);
+            }])
+            ->where('status', '!=', 'success');
 
-        // Filter jenis
         if (request('jenis') == 'spp') {
-            $query->where('jenis', 'spp');
+            $tagihanQuery->where('jenis', 'spp');
         } elseif (request('jenis') == 'non-spp') {
-            $query->where('jenis', '!=', 'spp');
+            $tagihanQuery->where('jenis', '!=', 'spp');
         }
 
-        $tagihan = $query->latest()->paginate(10);
+        $tagihan = $tagihanQuery->get();
+
+        // 2. Ambil SPP untuk periode yang unik saja
+        $sppPeriods = Pembayaran::where('user_id', $user->id)
+            ->whereNull('tagihan_id')
+            ->whereNotNull('tahun')
+            ->whereNotNull('bulan_mulai')
+            ->whereNotNull('bulan_akhir')
+            ->select('tahun', 'bulan_mulai', 'bulan_akhir')
+            ->distinct()
+            ->get();
+
+        $allData = collect();
         
-        return view('murid.tagihan.index', compact('tagihan'));
+        // Tambahkan tagihan biasa
+        $allData = $allData->merge($tagihan);
+        
+        // Buat virtual tagihan untuk setiap periode unik
+        foreach ($sppPeriods as $period) {
+            // Ambil salah satu pembayaran untuk periode ini (prioritaskan yang belum lunas)
+            $samplePayment = Pembayaran::where('user_id', $user->id)
+                ->whereNull('tagihan_id')
+                ->where('tahun', $period->tahun)
+                ->where('bulan_mulai', $period->bulan_mulai)
+                ->where('bulan_akhir', $period->bulan_akhir)
+                ->orderBy('status') // pending > rejected > accepted
+                ->first();
+                
+            if ($samplePayment) {
+                $sppAsTagihan = $this->convertSppToTagihanFormat($samplePayment);
+                if ($sppAsTagihan && !$sppAsTagihan->is_lunas) {
+                    $allData->push($sppAsTagihan);
+                }
+            }
+        }
+
+        // Pagination manual
+        $page = request('page', 1);
+        $perPage = 10;
+        $paginatedData = new LengthAwarePaginator(
+            $allData->forPage($page, $perPage),
+            $allData->count(),
+            $perPage,
+            $page,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
+
+        return view('murid.tagihan.index', ['tagihan' => $paginatedData]);
     }
 
-    // METHOD PEMBAYARAN HISTORY YANG DIPERLUKAN
+    private function convertSppToTagihanFormat($sppPayment)
+    {
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        
+        $bulanMulai = $sppPayment->bulan_mulai;
+        $bulanAkhir = $sppPayment->bulan_akhir;
+        $tahun = $sppPayment->tahun;
+        
+        if (!$bulanMulai || !$bulanAkhir) {
+            return null;
+        }
+
+        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+        $totalTagihan = $nominalSpp * $jumlahBulan;
+        
+        // Hitung total sudah dibayar untuk SPP periode ini (hanya yang accepted)
+        $totalDibayar = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'accepted')
+            ->sum('jumlah');
+
+        $sisaTagihan = $totalTagihan - $totalDibayar;
+        
+        // Cek status berdasarkan kondisi aktual
+        $isLunas = $sisaTagihan <= 0;
+        $isPending = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'pending')
+            ->exists();
+            
+        $isRejected = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->where('status', 'rejected')
+            ->exists();
+            
+        $isCicilan = $totalDibayar > 0 && $totalDibayar < $totalTagihan;
+        
+        // Bisa bayar jika masih ada sisa dan tidak ada yang pending
+        $bisaBayar = $sisaTagihan > 0 && !$isPending;
+
+        $persentaseDibayar = $totalTagihan > 0 ? ($totalDibayar / $totalTagihan) * 100 : 0;
+        $minimalBayar = max(1000, $sisaTagihan * 0.1);
+        
+        // Buat object tagihan virtual
+        $virtualTagihan = new \stdClass();
+        $virtualTagihan->id = 'spp_' . $sppPayment->id;
+        $virtualTagihan->jenis = 'spp';
+        $virtualTagihan->keterangan = 'SPP ' . $jumlahBulan . ' bulan (' . 
+            User::getNamaBulanStatic($bulanMulai) . ' - ' . 
+            User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun . ')';
+        $virtualTagihan->jumlah = $totalTagihan;
+        $virtualTagihan->status = $isLunas ? 'success' : ($isRejected ? 'rejected' : 'unpaid');
+        $virtualTagihan->created_at = $sppPayment->created_at;
+        $virtualTagihan->is_virtual = true;
+        
+        // Ambil semua pembayaran untuk periode ini
+        $virtualTagihan->pembayaran = Pembayaran::where('user_id', $sppPayment->user_id)
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->where('bulan_mulai', $bulanMulai)
+            ->where('bulan_akhir', $bulanAkhir)
+            ->get();
+        
+        // Set atribut
+        $virtualTagihan->total_dibayar = $totalDibayar;
+        $virtualTagihan->sisa_tagihan = $sisaTagihan;
+        $virtualTagihan->persentase_dibayar = $persentaseDibayar;
+        $virtualTagihan->is_lunas = $isLunas;
+        $virtualTagihan->is_pending = $isPending;
+        $virtualTagihan->is_cicilan = $isCicilan;
+        $virtualTagihan->is_rejected = $isRejected;
+        $virtualTagihan->bisa_bayar = $bisaBayar;
+        $virtualTagihan->minimal_bayar = $minimalBayar;
+        $virtualTagihan->jumlah_formatted = 'Rp ' . number_format($totalTagihan, 0, ',', '.');
+        $virtualTagihan->total_dibayar_formatted = 'Rp ' . number_format($totalDibayar, 0, ',', '.');
+        $virtualTagihan->sisa_tagihan_formatted = 'Rp ' . number_format($sisaTagihan, 0, ',', '.');
+        
+        return $virtualTagihan;
+    }
+
     public function pembayaranHistory()
     {
         $user = auth()->user();
@@ -257,14 +540,12 @@ class MuridController extends Controller
         return view('murid.pembayaran.history', compact('pembayaran'));
     }
 
-    // METHOD PROFILE YANG DIPERLUKAN
     public function profile()
     {
         $user = auth()->user();
         return view('murid.profile', compact('user'));
     }
 
-    // METHOD SHOW BAYAR SPP YANG DIPERLUKAN 
     public function showBayarSpp()
     {
         $sppSetting = SppSetting::latest()->first();
@@ -302,7 +583,7 @@ class MuridController extends Controller
 
         $user = auth()->user();
         
-        // Validasi: Cek apakah bulan sudah ada tagihan SPP yang belum lunas - DIPERBAIKI
+        // Validasi: Cek apakah bulan sudah ada tagihan SPP yang belum lunas
         $bulanSudahAda = [];
         for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
             if ($user->isBulanSudahDibayar($request->tahun, $bulan)) {
@@ -354,68 +635,23 @@ class MuridController extends Controller
             return redirect()->route('murid.pembayaran.history')
                 ->with('success', 'Pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             return back()->withErrors(['error' => 'Gagal membuat pembayaran SPP: ' . $e->getMessage()])->withInput();
         }
     }
 
-    private function cekBulanSudahAdaTagihanSpp($userId, $tahun, $bulanMulai, $bulanAkhir)
-    {
-        $bulanSudahAda = [];
-        
-        // Ambil semua tagihan SPP untuk tahun tersebut yang belum lunas
-        $tagihanSpp = Tagihan::where('user_id', $userId)
-            ->where('jenis', 'spp')
-            ->where('status', '!=', 'success')
-            ->get();
-
-        foreach ($tagihanSpp as $tagihan) {
-            // Extract bulan dari keterangan tagihan
-            preg_match_all('/\b(Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\b/', $tagihan->keterangan, $matches);
-            
-            $bulanDalamTagihan = [];
-            foreach ($matches[0] as $namaBulan) {
-                $bulan = array_search($namaBulan, [
-                    1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-                    5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus', 
-                    9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-                ]);
-                if ($bulan) {
-                    $bulanDalamTagihan[] = $bulan;
-                }
-            }
-
-            // Cek overlap
-            for ($bulan = $bulanMulai; $bulan <= $bulanAkhir; $bulan++) {
-                if (in_array($bulan, $bulanDalamTagihan)) {
-                    $bulanSudahAda[] = $bulan;
-                }
-            }
-        }
-
-        return array_unique($bulanSudahAda);
-    }
-
-    private function getNamaBulan($bulan): string
-    {
-        $bulanArr = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
-        ];
-        return $bulanArr[$bulan] ?? '';
-    }
-        
     public function uploadBukti(Request $request, $id)
     {
-        $tagihan = Tagihan::where('user_id', auth()->id())->findOrFail($id);
-        
-        // Cek apakah tagihan sudah lunas
-        if ($tagihan->is_lunas) {
-            return back()->with('error', 'Tagihan ini sudah lunas.');
+        \Log::info('=== UPLOAD BUKTI DIPANGGIL ===');
+
+        // Handle SPP virtual ID
+        if (strpos($id, 'spp_') === 0) {
+            return $this->handleUploadBuktiSpp($request, $id);
         }
 
+        $tagihan = Tagihan::where('user_id', auth()->id())->findOrFail($id);
+        
         $request->validate([
             'metode' => 'required|string',
             'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
@@ -423,107 +659,250 @@ class MuridController extends Controller
             'keterangan' => 'required|string|max:255'
         ]);
 
-        // Validasi jumlah bayar
-        if ($request->jumlah > $tagihan->sisa_tagihan) {
-            return back()->with('error', 'Jumlah bayar melebihi sisa tagihan.');
+        try {
+            DB::beginTransaction();
+
+            $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+            // Cek apakah sudah ada pembayaran untuk tagihan ini
+            $existingPayment = $tagihan->pembayaran()->first();
+
+            if ($existingPayment) {
+                // Update pembayaran yang sudah ada
+                $existingPayment->update([
+                    'metode' => $request->metode,
+                    'bukti' => $buktiPath,
+                    'jumlah' => $request->jumlah,
+                    'status' => 'pending',
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => 'cicilan', // sementara cicilan, nanti admin tentukan
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => now(),
+                    'alasan_reject' => null, // reset alasan reject
+                    'admin_id' => null // reset admin
+                ]);
+                \Log::info('Pembayaran diupdate: ' . $existingPayment->id);
+            } else {
+                // Buat baru kalau belum ada
+                $pembayaran = Pembayaran::create([
+                    'tagihan_id' => $tagihan->id,
+                    'user_id' => auth()->id(),
+                    'metode' => $request->metode,
+                    'bukti' => $buktiPath,
+                    'jumlah' => $request->jumlah,
+                    'status' => 'pending',
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => 'cicilan',
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => now()
+                ]);
+                \Log::info('Pembayaran dibuat baru: ' . $pembayaran->id);
+            }
+
+            // Update status tagihan
+            $tagihan->update(['status' => 'pending']);
+
+            DB::commit();
+
+            return redirect()->route('murid.tagihan.index')
+                ->with('success', 'Bukti pembayaran berhasil diupload. Menunggu verifikasi admin.');
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            \Log::error('Error: ' . $e->getMessage());
+            return back()->with('error', 'Gagal upload bukti: ' . $e->getMessage());
         }
-
-        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
-
-        // Buat pembayaran baru
-        $pembayaran = Pembayaran::create([
-            'tagihan_id' => $tagihan->id,
-            'user_id' => auth()->id(),
-            'metode' => $request->metode,
-            'bukti' => $buktiPath,
-            'jumlah' => $request->jumlah,
-            'status' => 'pending',
-            'keterangan' => $request->keterangan,
-            'jenis_bayar' => 'cicilan', // Default cicilan, nanti diupdate admin jika lunas
-            'tanggal_upload' => now(),
-            'tanggal_bayar' => now()
-        ]);
-
-        // Update status tagihan menjadi pending
-        $tagihan->update(['status' => 'pending']);
-
-        return redirect()->route('murid.tagihan.index')
-            ->with('success', 'Bukti pembayaran berhasil diupload. Menunggu verifikasi admin.');
     }
-    // app/Http/Controllers/MuridController.php
 
-    // Method untuk upload ulang pembayaran SPP yang direject
-    public function uploadUlangSpp(Request $request, $id)
+    private function handleUploadBuktiSpp(Request $request, $virtualId)
     {
-        $pembayaranLama = Pembayaran::where('user_id', auth()->id())
-            ->where('status', 'rejected')
-            ->findOrFail($id);
-
         $request->validate([
             'metode' => 'required|string',
             'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
-            'keterangan' => 'required|string'
+            'jumlah' => 'required|numeric|min:1000',
+            'keterangan' => 'required|string|max:255'
         ]);
 
-        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+        try {
+            // Extract ID asli
+            $sppId = str_replace('spp_', '', $virtualId);
+            $pembayaranSpp = Pembayaran::findOrFail($sppId);
 
-        // Buat pembayaran baru berdasarkan yang direject
-        Pembayaran::create([
-            'tagihan_id' => $pembayaranLama->tagihan_id,
-            'user_id' => auth()->id(),
-            'metode' => $request->metode,
-            'bukti' => $buktiPath,
-            'jumlah' => $pembayaranLama->jumlah,
-            'status' => 'pending',
-            'alasan_reject' => null,
-            'keterangan' => $request->keterangan,
-            'jenis_bayar' => 'lunas',
-            'tanggal_upload' => now(),
-            'tanggal_bayar' => now(),
-            'tahun' => $pembayaranLama->tahun,
-            'bulan_mulai' => $pembayaranLama->bulan_mulai,
-            'bulan_akhir' => $pembayaranLama->bulan_akhir
-        ]);
+            // Validasi kepemilikan
+            if ($pembayaranSpp->user_id != auth()->id()) {
+                return back()->with('error', 'Akses ditolak.');
+            }
 
-        return redirect()->route('murid.pembayaran.history')
-            ->with('success', 'Bukti pembayaran SPP berhasil diupload ulang. Menunggu verifikasi admin.');
+            // Hitung sisa tagihan SPP
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+            $jumlahBulan = ($pembayaranSpp->bulan_akhir - $pembayaranSpp->bulan_mulai) + 1;
+            $totalTagihan = $nominalSpp * $jumlahBulan;
+            
+            // Hitung total sudah dibayar (exclude pembayaran saat ini)
+            $totalDibayar = Pembayaran::where('user_id', auth()->id())
+                ->whereNull('tagihan_id')
+                ->where('tahun', $pembayaranSpp->tahun)
+                ->where('bulan_mulai', $pembayaranSpp->bulan_mulai)
+                ->where('bulan_akhir', $pembayaranSpp->bulan_akhir)
+                ->where('status', 'accepted')
+                ->where('id', '!=', $pembayaranSpp->id) // exclude current
+                ->sum('jumlah');
+
+            $sisaTagihan = $totalTagihan - $totalDibayar;
+
+            if ($request->jumlah > $sisaTagihan) {
+                return back()->with('error', 'Jumlah bayar melebihi sisa tagihan. Sisa: Rp ' . number_format($sisaTagihan, 0, ',', '.'));
+            }
+
+            $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+            // Tentukan jenis bayar
+            $akanLunas = ($totalDibayar + $request->jumlah) >= $totalTagihan;
+            $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
+
+            // Update data yang sudah ada, jangan buat baru
+            $pembayaranSpp->update([
+                'metode' => $request->metode,
+                'bukti' => $buktiPath,
+                'jumlah' => $request->jumlah,
+                'status' => 'pending',
+                'keterangan' => $request->keterangan,
+                'jenis_bayar' => $jenisBayar,
+                'tanggal_upload' => now(),
+                'tanggal_bayar' => now(),
+                'alasan_reject' => null,
+                'admin_id' => null
+            ]);
+
+            \Log::info('SPP diupdate: ' . $pembayaranSpp->id);
+
+            return redirect()->route('murid.tagihan.index')
+                ->with('success', 'Bukti pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
+
+        } catch (Exception $e) {
+            \Log::error('Error upload bukti SPP: ' . $e->getMessage());
+            return back()->with('error', 'Gagal upload bukti SPP: ' . $e->getMessage());
+        }
     }
 
-    public function uploadUlangTagihan(Request $request, $id)
+    public function uploadBuktiSpp(Request $request)
     {
-        $pembayaranLama = Pembayaran::where('user_id', auth()->id())
-            ->where('status', 'rejected')
-            ->findOrFail($id);
-
         $request->validate([
+            'spp_id' => 'required',
             'metode' => 'required|string',
-            'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048'
+            'bukti' => 'required|file|mimes:jpg,jpeg,png,pdf|max:2048',
+            'jumlah' => 'required|numeric|min:1000',
+            'keterangan' => 'required|string|max:255'
         ]);
 
-        $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+        try {
+            // Extract ID asli dari virtual ID (spp_38 -> 38)
+            $virtualId = $request->spp_id;
+            $sppId = str_replace('spp_', '', $virtualId);
+            $pembayaranSppAsli = Pembayaran::findOrFail($sppId);
 
-        // Buat pembayaran baru
-        Pembayaran::create([
-            'tagihan_id' => $pembayaranLama->tagihan_id,
-            'user_id' => auth()->id(),
-            'metode' => $request->metode,
-            'bukti' => $buktiPath,
-            'jumlah' => $pembayaranLama->jumlah,
-            'status' => 'pending',
-            'alasan_reject' => null,
-            'keterangan' => $pembayaranLama->keterangan,
-            'jenis_bayar' => 'lunas',
-            'tanggal_upload' => now(),
-            'tanggal_bayar' => now()
-        ]);
+            // Validasi kepemilikan
+            if ($pembayaranSppAsli->user_id != auth()->id()) {
+                return back()->with('error', 'Akses ditolak.');
+            }
 
-        // Update status tagihan menjadi pending
-        if ($pembayaranLama->tagihan) {
-            $pembayaranLama->tagihan->update(['status' => 'pending']);
+            // Cek apakah ini pembayaran yang sama periode
+            $pendingSppPayment = Pembayaran::where('user_id', auth()->id())
+                ->whereNull('tagihan_id')
+                ->where('tahun', $pembayaranSppAsli->tahun)
+                ->where('bulan_mulai', $pembayaranSppAsli->bulan_mulai)
+                ->where('bulan_akhir', $pembayaranSppAsli->bulan_akhir)
+                ->where('status', 'pending')
+                ->first();
+                
+            if ($pendingSppPayment) {
+                return back()->with('error', 'Masih ada pembayaran SPP yang menunggu verifikasi. Tunggu sampai pembayaran sebelumnya diproses admin.');
+            }
+
+            // Jika ada yang ditolak, update yang ditolak jadi pending
+            $rejectedSppPayment = Pembayaran::where('user_id', auth()->id())
+                ->whereNull('tagihan_id')
+                ->where('tahun', $pembayaranSppAsli->tahun)
+                ->where('bulan_mulai', $pembayaranSppAsli->bulan_mulai)
+                ->where('bulan_akhir', $pembayaranSppAsli->bulan_akhir)
+                ->where('status', 'rejected')
+                ->first();
+
+            if ($rejectedSppPayment) {
+                // Update yang ditolak jadi pending dengan data baru
+                $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+                
+                $rejectedSppPayment->update([
+                    'metode' => $request->metode,
+                    'bukti' => $buktiPath,
+                    'jumlah' => $request->jumlah,
+                    'status' => 'pending',
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => $rejectedSppPayment->jenis_bayar, // Pertahankan jenis bayar
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => now(),
+                    'alasan_reject' => null, // Hapus alasan reject
+                    'admin_id' => null // Reset admin
+                ]);
+
+                \Log::info('SPP ditolak diupdate menjadi pending: ' . $rejectedSppPayment->id);
+
+                return redirect()->route('murid.tagihan.index')
+                    ->with('success', 'Bukti pembayaran SPP berhasil diupload ulang. Menunggu verifikasi admin.');
+            }
+
+            // Hitung sisa tagihan SPP
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+            $jumlahBulan = ($pembayaranSppAsli->bulan_akhir - $pembayaranSppAsli->bulan_mulai) + 1;
+            $totalTagihan = $nominalSpp * $jumlahBulan;
+            
+            // Hitung total sudah dibayar (pembayaran SPP yang accepted)
+            $totalDibayar = Pembayaran::where('user_id', auth()->id())
+                ->whereNull('tagihan_id')
+                ->where('tahun', $pembayaranSppAsli->tahun)
+                ->where('bulan_mulai', $pembayaranSppAsli->bulan_mulai)
+                ->where('bulan_akhir', $pembayaranSppAsli->bulan_akhir)
+                ->where('status', 'accepted')
+                ->sum('jumlah');
+
+            $sisaTagihan = $totalTagihan - $totalDibayar;
+
+            // Validasi jumlah bayar
+            if ($request->jumlah > $sisaTagihan) {
+                return back()->with('error', 'Jumlah bayar melebihi sisa tagihan. Sisa: Rp ' . number_format($sisaTagihan, 0, ',', '.'));
+            }
+
+            $buktiPath = $request->file('bukti')->store('bukti-pembayaran', 'public');
+
+            // Tentukan jenis bayar
+            $akanLunas = ($totalDibayar + $request->jumlah) >= $totalTagihan;
+            $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
+
+            // Buat pembayaran SPP baru hanya jika tidak ada yang ditolak
+            $pembayaranBaru = Pembayaran::create([
+                'user_id' => auth()->id(),
+                'metode' => $request->metode,
+                'bukti' => $buktiPath,
+                'jumlah' => $request->jumlah,
+                'status' => 'pending',
+                'keterangan' => $request->keterangan,
+                'jenis_bayar' => $jenisBayar,
+                'tanggal_upload' => now(),
+                'tanggal_bayar' => now(),
+                'tahun' => $pembayaranSppAsli->tahun,
+                'bulan_mulai' => $pembayaranSppAsli->bulan_mulai,
+                'bulan_akhir' => $pembayaranSppAsli->bulan_akhir
+            ]);
+
+            return redirect()->route('murid.tagihan.index')
+                ->with('success', 'Bukti pembayaran SPP berhasil diupload. Menunggu verifikasi admin.');
+
+        } catch (Exception $e) {
+            \Log::error('Error upload bukti SPP: ' . $e->getMessage());
+            return back()->with('error', 'Gagal upload bukti SPP: ' . $e->getMessage());
         }
-
-        return redirect()->route('murid.pembayaran.history')
-            ->with('success', 'Bukti pembayaran tagihan berhasil diupload ulang. Menunggu verifikasi admin.');
     }
 
     public function updateProfile(Request $request)

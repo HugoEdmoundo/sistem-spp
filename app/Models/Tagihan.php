@@ -160,9 +160,13 @@ class Tagihan extends Model
     // Methods
     public function bisaBayar()
     {
-        return !$this->is_lunas;
+        // Bisa bayar kalo: BELUM LUNAS dan GA ADA PEMBAYARAN PENDING
+        $adaPending = $this->pembayaran()
+            ->where('status', 'pending')
+            ->exists();
+            
+        return !$this->is_lunas && !$adaPending;
     }
-
     public function getMinimalPembayaranBerikutnya()
     {
         $sisa = $this->sisa_tagihan;
@@ -187,5 +191,12 @@ class Tagihan extends Model
     {
         return ($this->total_dibayar + $jumlah) >= $this->jumlah;
     }
+
+    // Di app/Models/Tagihan.php - tambahkan method ini:
+    public function getMinimalBayarAttribute()
+    {
+        return $this->getMinimalPembayaranBerikutnya();
+    }
+
 }
 

@@ -370,56 +370,63 @@ class AdminController extends Controller
     }
 
     public function approvePembayaran($id)
-{
-    DB::transaction(function () use ($id) {
-        $pembayaran = Pembayaran::with('tagihan')->findOrFail($id);
-        
-        $pembayaran->update([
-            'status' => 'accepted',
-            'tanggal_proses' => now(),
-            'admin_id' => auth()->id()
-        ]);
+    {
+        DB::transaction(function () use ($id) {
+            $pembayaran = Pembayaran::with('tagihan')->findOrFail($id);
+            
+            $pembayaran->update([
+                'status' => 'accepted',
+                'tanggal_proses' => now(),
+                'admin_id' => auth()->id()
+            ]);
 
-        // Untuk TAGIHAN
-        if ($pembayaran->tagihan) {
-            $tagihan = $pembayaran->tagihan;
-            
-            // Hitung TOTAL semua pembayaran yang sudah accepted
-            $totalDibayar = $tagihan->pembayaran()
-                ->where('status', 'accepted')
-                ->sum('jumlah');
-            
-            // Tentukan jenis bayar berdasarkan apakah sudah lunas atau masih cicilan
-            if ($totalDibayar >= $tagihan->jumlah) {
-                // SUDAH LUNAS - Total semua pembayaran >= jumlah tagihan
-                $pembayaran->update(['jenis_bayar' => 'lunas']);
-                $tagihan->update(['status' => 'success']);
-            } else {
-                // MASIH CICILAN - Total pembayaran masih kurang
-                $pembayaran->update(['jenis_bayar' => 'cicilan']);
-                $tagihan->update(['status' => 'unpaid']); // Tetap unpaid sampai lunas
+            // Untuk TAGIHAN BIASA
+            if ($pembayaran->tagihan) {
+                $tagihan = $pembayaran->tagihan;
+                
+                // Hitung TOTAL semua pembayaran yang accepted
+                $totalDibayar = $tagihan->pembayaran()
+                    ->where('status', 'accepted')
+                    ->sum('jumlah');
+                
+                if ($totalDibayar >= $tagihan->jumlah) {
+                    // SUDAH LUNAS
+                    $pembayaran->update(['jenis_bayar' => 'lunas']);
+                    $tagihan->update(['status' => 'success']);
+                } else {
+                    // MASIH CICILAN
+                    $pembayaran->update(['jenis_bayar' => 'cicilan']);
+                    $tagihan->update(['status' => 'unpaid']);
+                }
             }
-        }
-        // Untuk SPP
-        else {
-            $sppSetting = SppSetting::latest()->first();
-            $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
-            $jumlahBulan = ($pembayaran->bulan_akhir - $pembayaran->bulan_mulai) + 1;
-            $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
-            
-            if ($pembayaran->jumlah >= $totalHarusBayar) {
-                $pembayaran->update(['jenis_bayar' => 'lunas']);
-            } else {
-                $pembayaran->update(['jenis_bayar' => 'cicilan']);
+            // Untuk SPP
+            else {
+                $sppSetting = SppSetting::latest()->first();
+                $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+                $jumlahBulan = ($pembayaran->bulan_akhir - $pembayaran->bulan_mulai) + 1;
+                $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+                
+                // Hitung total sudah dibayar untuk SPP periode ini
+                $totalDibayarSpp = Pembayaran::where('user_id', $pembayaran->user_id)
+                    ->whereNull('tagihan_id')
+                    ->where('tahun', $pembayaran->tahun)
+                    ->where('bulan_mulai', $pembayaran->bulan_mulai)
+                    ->where('bulan_akhir', $pembayaran->bulan_akhir)
+                    ->where('status', 'accepted')
+                    ->sum('jumlah');
+                
+                if ($totalDibayarSpp >= $totalHarusBayar) {
+                    $pembayaran->update(['jenis_bayar' => 'lunas']);
+                } else {
+                    $pembayaran->update(['jenis_bayar' => 'cicilan']);
+                }
             }
-        }
 
-        // Buat notifikasi
-        $this->createPembayaranNotification($pembayaran);
-    });
+            $this->createPembayaranNotification($pembayaran);
+        });
 
-    return back()->with('success', 'Pembayaran berhasil disetujui.');
-}
+        return back()->with('success', 'Pembayaran berhasil disetujui.');
+    }
 
 private function createPembayaranNotification($pembayaran)
 {
@@ -548,6 +555,107 @@ private function createPembayaranNotification($pembayaran)
         return back()->with('success', 'Profile berhasil diperbarui.');
     }
 
+
+    // AdminController.php
+    // AdminController.php - perbaiki method getSppCicilan
+    public function getSppCicilan($userId)
+    {
+        try {
+            \Log::info('Getting SPP cicilan for user: ' . $userId);
+            
+            $user = User::findOrFail($userId);
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+
+            \Log::info('Nominal SPP: ' . $nominalSpp);
+
+            // Ambil semua pembayaran SPP yang masih cicilan atau belum lunas
+            $sppPayments = Pembayaran::where('user_id', $userId)
+                ->whereNull('tagihan_id')
+                ->whereNotNull('tahun')
+                ->whereNotNull('bulan_mulai')
+                ->whereNotNull('bulan_akhir')
+                ->where(function($query) {
+                    $query->where('status', 'accepted')
+                        ->orWhere('status', 'pending');
+                })
+                ->get();
+
+            \Log::info('Found SPP payments: ' . $sppPayments->count());
+
+            // Group by periode
+            $groupedPayments = $sppPayments->groupBy(function($payment) {
+                return $payment->tahun . '_' . $payment->bulan_mulai . '_' . $payment->bulan_akhir;
+            });
+
+            $result = [];
+
+            foreach ($groupedPayments as $key => $payments) {
+                list($tahun, $bulanMulai, $bulanAkhir) = explode('_', $key);
+                
+                $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+                $totalTagihan = $nominalSpp * $jumlahBulan;
+
+                // Hitung total sudah dibayar (hanya yang accepted)
+                $totalDibayar = $payments->where('status', 'accepted')->sum('jumlah');
+                $sisaTagihan = $totalTagihan - $totalDibayar;
+
+                \Log::info("Periode {$tahun}-{$bulanMulai}-{$bulanAkhir}: Total={$totalTagihan}, Dibayar={$totalDibayar}, Sisa={$sisaTagihan}");
+
+                // Hanya tampilkan yang masih ada sisa tagihan
+                if ($sisaTagihan > 0) {
+                    $status = $totalDibayar > 0 ? 'cicilan' : 'belum_bayar';
+                    
+                    // Detail per bulan
+                    $detailBulan = [];
+                    for ($bulan = $bulanMulai; $bulan <= $bulanAkhir; $bulan++) {
+                        $sudahDibayarBulan = Pembayaran::where('user_id', $userId)
+                            ->whereNull('tagihan_id')
+                            ->where('tahun', $tahun)
+                            ->where('bulan_mulai', '<=', $bulan)
+                            ->where('bulan_akhir', '>=', $bulan)
+                            ->where('status', 'accepted')
+                            ->sum('jumlah');
+                        
+                        $statusBulan = $sudahDibayarBulan >= $nominalSpp ? 'lunas' : 
+                                    ($sudahDibayarBulan > 0 ? 'cicilan' : 'belum_bayar');
+                        
+                        $detailBulan[] = [
+                            'bulan' => $bulan,
+                            'nama_bulan' => User::getNamaBulanStatic($bulan),
+                            'nominal_bulan' => $nominalSpp,
+                            'sudah_dibayar' => $sudahDibayarBulan,
+                            'status' => $statusBulan
+                        ];
+                    }
+
+                    $result[] = [
+                        'id' => $payments->first()->id,
+                        'periode' => 'SPP ' . User::getNamaBulanStatic($bulanMulai) . ' - ' . 
+                                    User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun,
+                        'tahun' => $tahun,
+                        'bulan_mulai' => (int)$bulanMulai,
+                        'bulan_akhir' => (int)$bulanAkhir,
+                        'jumlah_bulan' => $jumlahBulan,
+                        'total_tagihan' => $totalTagihan,
+                        'total_dibayar' => $totalDibayar,
+                        'sisa_tagihan' => $sisaTagihan,
+                        'status' => $status,
+                        'detail_bulan' => $detailBulan
+                    ];
+                }
+            }
+
+            \Log::info('Final result count: ' . count($result));
+            return response()->json($result);
+
+        } catch (\Exception $e) {
+            \Log::error('Error get SPP cicilan: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            return response()->json([], 500);
+        }
+    }
+
     // ==================== PEMBAYARAN MANUAL ====================
     public function pembayaranManualCreate()
     {
@@ -584,12 +692,13 @@ private function createPembayaranNotification($pembayaran)
     }
     
     // Di AdminController.php - Method pembayaranManualStore
+    // Di AdminController.php - update method pembayaranManualStore
     public function pembayaranManualStore(Request $request)
     {
         // Validasi dasar
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            'tipe_pembayaran' => 'required|in:spp,tagihan',
+            'tipe_pembayaran' => 'required|in:spp,spp_cicilan,tagihan',
             'jumlah' => 'required|numeric|min:1000',
             'metode' => 'required|in:Tunai,Transfer,QRIS',
             'keterangan' => 'required|string',
@@ -608,85 +717,138 @@ private function createPembayaranNotification($pembayaran)
                 ]);
 
                 $tagihan = Tagihan::find($request->tagihan_id);
-                
-                // Validasi: pastikan tagihan milik user yang dipilih
+
+                // Validasi: pastikan tagihan milik user
                 if ($tagihan->user_id != $request->user_id) {
                     return back()->with('error', '❌ Tagihan tidak sesuai dengan murid yang dipilih!')->withInput();
                 }
 
-                // Validasi jumlah bayar tidak melebihi sisa tagihan
                 if ($request->jumlah > $tagihan->sisa_tagihan) {
                     return back()->with('error', '❌ Jumlah bayar melebihi sisa tagihan! Sisa: Rp ' . number_format($tagihan->sisa_tagihan, 0, ',', '.'))->withInput();
                 }
 
-                // Tentukan jenis bayar
                 $akanLunas = $tagihan->akanLunasDenganJumlah($request->jumlah);
                 $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
 
-                // Buat pembayaran TAGIHAN
                 $pembayaran = Pembayaran::create([
-                    'tagihan_id' => $tagihan->id, // Ada tagihan_id untuk pembayaran tagihan
+                    'tagihan_id' => $tagihan->id,
                     'user_id' => $request->user_id,
                     'metode' => $request->metode,
-                    'bukti' => null, // Manual payment no bukti
+                    'bukti' => null,
                     'jumlah' => $request->jumlah,
-                    'status' => 'accepted', // Langsung accepted karena manual
+                    'status' => 'accepted',
                     'keterangan' => $request->keterangan,
                     'jenis_bayar' => $jenisBayar,
                     'tanggal_upload' => now(),
                     'tanggal_bayar' => $request->tanggal_bayar,
                     'tanggal_proses' => now(),
                     'admin_id' => auth()->id()
-                    // TIDAK ADA tahun, bulan_mulai, bulan_akhir untuk pembayaran tagihan
                 ]);
 
-                // Update status tagihan
-                if ($akanLunas) {
-                    $tagihan->update(['status' => 'success']);
-                } else {
-                    $tagihan->update(['status' => 'unpaid']); // Tetap unpaid karena masih cicilan
+                $tagihan->update([
+                    'status' => $akanLunas ? 'success' : 'unpaid'
+                ]);
+
+            } 
+            elseif ($request->tipe_pembayaran == 'spp_cicilan') {
+                // ========== PEMBAYARAN SPP CICILAN ==========
+                $request->validate([
+                    'spp_cicilan_id' => 'required'
+                ]);
+
+                // Ambil data SPP asli untuk mendapatkan periode
+                $sppAsli = Pembayaran::findOrFail($request->spp_cicilan_id);
+                
+                $sppSetting = SppSetting::latest()->first();
+                $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+                
+                $bulanMulai = $sppAsli->bulan_mulai;
+                $bulanAkhir = $sppAsli->bulan_akhir;
+                $tahun = $sppAsli->tahun;
+
+                $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+                $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+
+                // Hitung total sudah dibayar untuk periode ini
+                $totalSudahDibayar = Pembayaran::where('user_id', $request->user_id)
+                    ->whereNull('tagihan_id')
+                    ->where('tahun', $tahun)
+                    ->where('bulan_mulai', $bulanMulai)
+                    ->where('bulan_akhir', $bulanAkhir)
+                    ->where('status', 'accepted')
+                    ->sum('jumlah');
+
+                $sisaTagihan = $totalHarusBayar - $totalSudahDibayar;
+
+                if ($request->jumlah > $sisaTagihan) {
+                    return back()->with('error', '❌ Jumlah bayar melebihi sisa SPP! Sisa: Rp ' . number_format($sisaTagihan, 0, ',', '.'))->withInput();
                 }
 
-            } else {
-                // ========== PEMBAYARAN SPP ==========
+                $akanLunas = ($totalSudahDibayar + $request->jumlah) >= $totalHarusBayar;
+                $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
+
+                $pembayaran = Pembayaran::create([
+                    'tagihan_id' => null,
+                    'user_id' => $request->user_id,
+                    'metode' => $request->metode,
+                    'bukti' => null,
+                    'jumlah' => $request->jumlah,
+                    'status' => 'accepted',
+                    'keterangan' => $request->keterangan,
+                    'jenis_bayar' => $jenisBayar,
+                    'tanggal_upload' => now(),
+                    'tanggal_bayar' => $request->tanggal_bayar,
+                    'tanggal_proses' => now(),
+                    'admin_id' => auth()->id(),
+                    'tahun' => $tahun,
+                    'bulan_mulai' => $bulanMulai,
+                    'bulan_akhir' => $bulanAkhir
+                ]);
+
+            }
+            else {
+                // ========== PEMBAYARAN SPP BARU ==========
                 $request->validate([
                     'bulan_mulai' => 'required|integer|min:1|max:12',
                     'bulan_akhir' => 'required|integer|min:1|max:12',
                     'tahun' => 'required|integer'
                 ]);
 
-                // Validasi range bulan
                 if ($request->bulan_mulai > $request->bulan_akhir) {
-                    return back()->with('error', '❌ Bulan akhir harus lebih besar atau sama dengan bulan mulai!')->withInput();
+                    return back()->with('error', '❌ Bulan akhir harus ≥ bulan mulai!')->withInput();
                 }
 
-                // Cek apakah sudah ada pembayaran SPP untuk periode tersebut
-                $bulanSudahBayar = [];
-                for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
-                    if ($user->isBulanSudahDibayar($request->tahun, $bulan)) {
-                        $bulanSudahBayar[] = $bulan;
-                    }
-                }
-
-                if (!empty($bulanSudahBayar)) {
-                    $bulanNames = array_map(function($bulan) {
-                        return User::getNamaBulanStatic($bulan);
-                    }, $bulanSudahBayar);
-                    
-                    return back()->with('error', '❌ Bulan ' . implode(', ', $bulanNames) . ' sudah memiliki pembayaran SPP!')->withInput();
-                }
-
-                // Tentukan jenis bayar
                 $sppSetting = SppSetting::latest()->first();
                 $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+
                 $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
                 $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
 
-                $jenisBayar = $request->jumlah >= $totalHarusBayar ? 'lunas' : 'cicilan';
+                // Cek apakah ada bulan yang sudah lunas
+                $bulanSudahLunas = [];
+                for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
+                    if ($user->isBulanSudahLunas($request->tahun, $bulan)) {
+                        $bulanSudahLunas[] = $bulan;
+                    }
+                }
 
-                // Buat pembayaran SPP MURNI (tanpa tagihan_id)
+                if (!empty($bulanSudahLunas)) {
+                    $bulanNames = array_map(function($bulan) {
+                        return User::getNamaBulanStatic($bulan);
+                    }, $bulanSudahLunas);
+                    
+                    return back()->with('error', '❌ Bulan ' . implode(', ', $bulanNames) . ' sudah lunas. Tidak bisa dibuat SPP baru.')->withInput();
+                }
+
+                if ($request->jumlah > $totalHarusBayar) {
+                    return back()->with('error', '❌ Jumlah bayar melebihi total SPP! Total: Rp ' . number_format($totalHarusBayar, 0, ',', '.'))->withInput();
+                }
+
+                $akanLunas = $request->jumlah >= $totalHarusBayar;
+                $jenisBayar = $akanLunas ? 'lunas' : 'cicilan';
+
                 $pembayaran = Pembayaran::create([
-                    'tagihan_id' => null, // NULL untuk pembayaran SPP murni
+                    'tagihan_id' => null,
                     'user_id' => $request->user_id,
                     'metode' => $request->metode,
                     'bukti' => null,
@@ -701,36 +863,85 @@ private function createPembayaranNotification($pembayaran)
                     'tahun' => $request->tahun,
                     'bulan_mulai' => $request->bulan_mulai,
                     'bulan_akhir' => $request->bulan_akhir
-                    // ADA tahun, bulan_mulai, bulan_akhir untuk pembayaran SPP
                 ]);
-
-                // TIDAK membuat tagihan SPP, karena ini pembayaran SPP langsung
             }
 
-            // Buat notifikasi untuk murid
-            Notification::create([
-                'user_id' => $request->user_id,
-                'type' => 'pembayaran_manual',
-                'title' => 'Pembayaran Manual',
-                'message' => "Admin mencatat pembayaran manual sebesar Rp " . number_format($request->jumlah, 0, ',', '.') . " untuk " . ($request->tipe_pembayaran == 'spp' ? 'SPP' : 'tagihan'),
-                'data' => [
-                    'pembayaran_id' => $pembayaran->id,
-                    'jumlah' => $request->jumlah,
-                    'tipe' => $request->tipe_pembayaran
-                ],
-                'related_type' => 'App\Models\Pembayaran',
-                'related_id' => $pembayaran->id
-            ]);
-
             DB::commit();
-
-            return redirect()->route('admin.pembayaran.history')
-                ->with('success', '✅ Pembayaran manual berhasil dicatat!')
-                ->with('info', '💰 Pembayaran telah otomatis diverifikasi dan tercatat dalam sistem.');
+            return back()->with('success', 'Pembayaran berhasil ditambahkan!');
 
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', '❌ Gagal mencatat pembayaran manual: ' . $e->getMessage())->withInput();
+            \Log::error("Error pembayaran manual: " . $e->getMessage());
+            return back()->with('error', 'Terjadi kesalahan sistem!')->withInput();
+        }
+    }
+          
+    public function checkSppPayment(Request $request)
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'tahun' => 'required|integer', 
+            'bulan_mulai' => 'required|integer|min:1|max:12',
+            'bulan_akhir' => 'required|integer|min:1|max:12'
+        ]);
+
+        try {
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSppPerBulan = $sppSetting ? $sppSetting->nominal : 0;
+            $jumlahBulan = ($request->bulan_akhir - $request->bulan_mulai) + 1;
+            $totalHarusBayar = $nominalSppPerBulan * $jumlahBulan;
+
+            // ⭐⭐ HITUNG SISA PER BULAN ⭐⭐
+            $bulanDetail = [];
+            $totalSudahDibayar = 0;
+            $totalSisaTagihan = 0;
+            
+            for ($bulan = $request->bulan_mulai; $bulan <= $request->bulan_akhir; $bulan++) {
+                // Hitung sudah dibayar untuk bulan ini
+                $sudahDibayar = Pembayaran::where('user_id', $request->user_id)
+                    ->whereNull('tagihan_id')
+                    ->where('tahun', $request->tahun)
+                    ->where(function($query) use ($bulan) {
+                        $query->where('bulan_mulai', '<=', $bulan)
+                            ->where('bulan_akhir', '>=', $bulan);
+                    })
+                    ->where('status', 'accepted')
+                    ->sum('jumlah');
+                    
+                $sisaBulan = $nominalSppPerBulan - $sudahDibayar;
+                $statusBulan = $sisaBulan <= 0 ? 'lunas' : ($sudahDibayar > 0 ? 'cicilan' : 'belum_bayar');
+                
+                $bulanDetail[] = [
+                    'bulan' => $bulan,
+                    'nama_bulan' => \App\Models\User::getNamaBulanStatic($bulan),
+                    'sudah_dibayar' => $sudahDibayar,
+                    'sisa' => max(0, $sisaBulan),
+                    'status' => $statusBulan
+                ];
+                
+                $totalSudahDibayar += $sudahDibayar;
+                $totalSisaTagihan += max(0, $sisaBulan);
+            }
+
+            return response()->json([
+                'total_dibayar' => $totalSudahDibayar,
+                'sisa_tagihan' => $totalSisaTagihan,
+                'total_harus_bayar' => $totalHarusBayar,
+                'jumlah_bulan' => $jumlahBulan,
+                'bulan_detail' => $bulanDetail,
+                'ada_pembayaran_sebelumnya' => $totalSudahDibayar > 0
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error check SPP payment: ' . $e->getMessage());
+            return response()->json([
+                'total_dibayar' => 0,
+                'sisa_tagihan' => 0,
+                'total_harus_bayar' => 0,
+                'jumlah_bulan' => 0,
+                'bulan_detail' => [],
+                'ada_pembayaran_sebelumnya' => false
+            ], 500);
         }
     }
 
@@ -852,4 +1063,5 @@ private function createPembayaranNotification($pembayaran)
             'pembayaranPendingCount'
         ));
     }
+
 }

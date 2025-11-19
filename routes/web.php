@@ -61,6 +61,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/kuitansi/{pembayaranId}', [AdminController::class, 'generateKuitansi'])->name('admin.kuitansi.pdf');
     // Riwayat Pembayaran
     Route::get('/pembayaran/history', [AdminController::class, 'pembayaranHistory'])->name('admin.pembayaran.history');
+    Route::get('/admin/kuitansi/{pembayaran}/pdf', [AdminController::class, 'generateKuitansi'])->name('admin.kuitansi.pdf');
     
     // Laporan Routes
     Route::get('/laporan', [LaporanController::class, 'index'])->name('admin.laporan.index');
@@ -81,6 +82,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->group(function () {
     Route::get('/laporan/debug/{userId?}/{tahun?}', [LaporanController::class, 'debugData'])->name('admin.laporan.debug');
     Route::get('/admin/laporan/debug-spp/{tahun?}', [LaporanController::class, 'debugSpp'])
     ->name('admin.laporan.debug.spp');
+
+    Route::get('/get-spp-cicilan/{userId}', [AdminController::class, 'getSppCicilan'])->name('admin.get.spp.cicilan');
 });
 
 // routes/web.php
@@ -100,6 +103,8 @@ Route::prefix('laporan')->group(function () {
     // Export Pengeluaran
     Route::get('/pengeluaran/excel/{tahun}', [LaporanController::class, 'exportPengeluaranExcel'])->name('admin.laporan.export.pengeluaran.excel');
     Route::get('/pengeluaran/pdf/{tahun}', [LaporanController::class, 'exportPengeluaranPdf'])->name('admin.laporan.export.pengeluaran.pdf');
+
+    Route::get('/admin/check-spp-payment', [AdminController::class, 'checkSppPayment'])->name('admin.check.spp.payment');
 });
 
 // Murid Routes
@@ -120,6 +125,14 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     Route::get('/rekap-spp', [MuridController::class, 'rekapSppSaya'])->name('murid.rekap.spp');
     Route::post('/pembayaran/{id}/upload-ulang', [MuridController::class, 'uploadUlangTagihan'])->name('murid.pembayaran.upload-ulang');
     Route::post('/spp/{id}/upload-ulang', [MuridController::class, 'uploadUlangSpp'])->name('murid.spp.upload-ulang');
+
+    // Route untuk upload bukti tagihan biasa
+    Route::post('/tagihan/upload-bukti/{id}', [MuridController::class, 'uploadBukti'])
+        ->name('murid.tagihan.upload-bukti');
+
+    // Route untuk upload bukti SPP  
+    Route::post('/spp/upload-bukti', [MuridController::class, 'uploadBuktiSpp'])
+        ->name('murid.spp.upload-bukti');
 });
 
 // Validation Route - PERBAIKI: tambahkan use statement untuk Request
