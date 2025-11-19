@@ -4,29 +4,48 @@
 <head>
   <meta charset="UTF-8">
   <title>KUITANSI - {{ $pembayaran->id }}</title>
-
+  
   <style>
-    @page { 
-      margin: 0; 
-      size: A4; 
+    /* RESET DAN PENGATURAN DASAR UNTUK PDF */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
-
+    
+    @page {
+      size: A4;
+      margin: 15mm 18mm;
+    }
+    
     body {
       font-family: "Times New Roman", serif;
-      margin: 15mm 18mm;
       color: #000;
       line-height: 1.4;
       position: relative;
       font-size: 14px;
+      background: white;
+      width: 100%;
+      min-height: 297mm;
+      padding: 0;
+      margin: 0;
     }
 
-    /* WATERMARK KEREN */
+    /* KONTAINER UTAMA */
+    .container {
+      width: 100%;
+      max-width: 210mm;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    /* WATERMARK - DIPERBAIKI UNTUK PDF */
     .watermark {
       position: fixed;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotate(-15deg);
-      font-size: 120px;
+      transform: translate(-50%, -50%) rotate(-45deg);
+      font-size: 100px;
       font-weight: 900;
       color: #4CAF50;
       opacity: 0.08;
@@ -38,46 +57,25 @@
       font-family: "Arial", sans-serif;
     }
 
-    .watermark-circle {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 400px;
-      height: 400px;
-      border: 8px solid rgba(76, 175, 80, 0.05);
-      border-radius: 50%;
-      z-index: -1;
-    }
-
-    .watermark-pattern {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: 
-        radial-gradient(circle at 20% 80%, rgba(76, 175, 80, 0.03) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(76, 175, 80, 0.03) 0%, transparent 50%);
-      z-index: -1;
-    }
-
-    /* HEADER */
+    /* HEADER - DIPERBAIKI */
     .header {
       text-align: center;
       border-bottom: 2px solid #4CAF50;
-      padding-bottom: 10px;
+      padding-bottom: 15px;
       margin-bottom: 20px;
       position: relative;
     }
+    
     .header h1 { 
-      margin: 0; 
+      margin: 0 0 10px 0; 
       font-size: 24px; 
       font-weight: bold; 
       color: #2E7D32;
+      letter-spacing: 1px;
     }
+    
     .header p { 
-      margin: 5px 0; 
+      margin: 3px 0; 
       font-size: 14px; 
       color: #666;
     }
@@ -92,271 +90,338 @@
       background: linear-gradient(90deg, transparent, #4CAF50, transparent);
     }
 
-    /* INFO BOX */
+    /* INFO BOX - DIPERBAIKI */
     .info-box {
       border: 2px solid #4CAF50;
       padding: 15px;
-      margin-top: 15px;
-      background: linear-gradient(135deg, #f8fff8 0%, #f0f9f0 100%);
+      margin: 15px 0 25px 0;
+      background: #f8fff8;
       border-radius: 8px;
       font-size: 14px;
-      box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);
     }
 
     .info-box table { 
       width: 100%; 
+      border-collapse: collapse;
+    }
+    
+    .info-box tr td:first-child {
+      width: 140px;
+      font-weight: bold;
+      vertical-align: top;
+    }
+    
+    .info-box tr td {
+      padding: 4px 0;
     }
 
-    /* CONTENT */
-    .content { 
-      margin-top: 25px; 
-    }
+    /* TABEL INFORMASI - DIPERBAIKI */
     .info-table { 
       width: 100%; 
       border-collapse: collapse; 
       font-size: 14px; 
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      border-radius: 6px;
-      overflow: hidden;
+      margin: 20px 0;
+      border: 1px solid #e0e0e0;
     }
+    
     .info-table th {
-      width: 28%;
-      background: linear-gradient(135deg, #4CAF50, #45a049);
+      width: 30%;
+      background: #4CAF50;
       color: white;
-      padding: 10px 12px;
+      padding: 12px 15px;
       text-align: left;
       font-weight: bold;
-      border-bottom: 1px solid #e2e2e2;
+      border-right: 1px solid #e0e0e0;
     }
+    
     .info-table td {
-      padding: 10px 12px;
+      padding: 12px 15px;
       border-bottom: 1px solid #f0f0f0;
       background: white;
     }
 
-    .info-table tr:last-child th,
     .info-table tr:last-child td {
       border-bottom: none;
     }
 
-    /* JUMLAH */
+    /* BAGIAN JUMLAH - DIPERBAIKI */
     .jumlah-section {
       text-align: center;
-      margin: 35px 0 30px 0;
-      padding: 20px;
-      background: linear-gradient(135deg, #f8fff8, #f0f9f0);
-      border-radius: 10px;
+      margin: 30px 0;
+      padding: 25px 20px;
+      background: #f8fff8;
+      border-radius: 8px;
       border: 2px dashed #4CAF50;
     }
-    .jumlah-section .nominal {
+    
+    .jumlah-label {
+      font-size: 16px; 
+      color: #666;
+      margin-bottom: 10px;
+    }
+    
+    .nominal {
       font-size: 28px;
       font-weight: bold;
-      margin-top: 8px;
       color: #2E7D32;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
 
-    /* TTD */
-    .ttd-center {
-      text-align: center;
-      margin-top: 45px;
-      padding: 20px;
-      background: white;
-      border-radius: 8px;
-      position: relative;
+    /* BAGIAN TERBILANG - DIPERBAIKI */
+    .terbilang {
+      font-size: 14px;
+      background: #f8fff8;
+      padding: 12px 15px;
+      border-radius: 6px;
+      border-left: 4px solid #4CAF50;
+      margin: 15px 0 25px 0;
     }
+
+    /* BAGIAN TANDA TANGAN - DIPERBAIKI */
+    .ttd-section {
+      text-align: center;
+      margin: 40px 0 30px 0;
+      padding: 20px;
+    }
+    
     .qr-ttd {
-      width: 140px;
-      margin-bottom: 15px;
-      border: 2px solid #4CAF50;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 15px auto;
+      border: 1px solid #4CAF50;
       border-radius: 8px;
       padding: 5px;
       background: white;
+      display: block;
     }
+    
     .ttd-line {
-      width: 220px;
-      border-top: 3px solid #4CAF50;
-      margin: 45px auto 10px auto;
-      position: relative;
+      width: 200px;
+      border-top: 2px solid #4CAF50;
+      margin: 40px auto 8px auto;
     }
-    .ttd-line:before {
-      content: "";
-      position: absolute;
-      top: -3px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 20px;
-      height: 3px;
-      background: #4CAF50;
-    }
+    
     .nama-ttd {
       font-weight: bold;
-      font-size: 15px;
+      font-size: 16px;
       color: #2E7D32;
+      margin-top: 5px;
+    }
+    
+    .jabatan-ttd {
+      font-size: 14px; 
+      color: #666;
     }
 
-    /* FOOTER */
+    /* FOOTER - DIPERBAIKI */
     .footer {
       text-align: center;
       margin-top: 40px;
       font-size: 12px;
       color: #666;
       border-top: 1px solid #4CAF50;
-      padding-top: 12px;
-      background: linear-gradient(135deg, #f8fff8, #f0f9f0);
+      padding-top: 15px;
+      background: #f8fff8;
       padding: 15px;
       border-radius: 8px;
     }
 
-    /* STAMP EFFECT */
+    /* STAMP EFFECT - DIPERBAIKI UNTUK PDF */
     .stamp {
       position: absolute;
-      top: 50%;
-      right: 30px;
-      transform: translateY(-50%) rotate(5deg);
-      width: 140px;
-      height: 140px;
-      border: 4px solid #4CAF50;
+      top: 120px;
+      right: 20px;
+      transform: rotate(15deg);
+      width: 120px;
+      height: 120px;
+      border: 3px solid #4CAF50;
       border-radius: 50%;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
       color: #4CAF50;
       font-weight: bold;
-      font-size: 18px;
+      font-size: 16px;
       text-align: center;
-      background: rgba(255,255,255,0.95);
-      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-      animation: pulse 2s infinite;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 3px 10px rgba(76, 175, 80, 0.3);
+      line-height: 1.2;
+      z-index: 10;
     }
 
-    .stamp:before {
-      content: "";
+    /* STATUS BADGE */
+    .status-badge {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 4px;
+      background-color: #4CAF50;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+    }
+    
+    /* DEKORASI SEDERHANA */
+    .corner {
       position: absolute;
-      width: 120px;
-      height: 120px;
-      border: 2px solid #4CAF50;
-      border-radius: 50%;
+      width: 20px;
+      height: 20px;
     }
-
-    @keyframes pulse {
-      0% { transform: translateY(-50%) rotate(5deg) scale(1); }
-      50% { transform: translateY(-50%) rotate(5deg) scale(1.05); }
-      100% { transform: translateY(-50%) rotate(5deg) scale(1); }
-    }
-
-    /* DECORATIVE ELEMENTS */
-    .corner-decoration {
-      position: fixed;
-      width: 100px;
-      height: 100px;
-      z-index: -1;
-      opacity: 0.1;
-    }
-
+    
     .corner-tl {
-      top: 10px;
-      left: 10px;
-      border-top: 3px solid #4CAF50;
-      border-left: 3px solid #4CAF50;
+      top: 0;
+      left: 0;
+      border-top: 2px solid #4CAF50;
+      border-left: 2px solid #4CAF50;
     }
-
+    
     .corner-tr {
-      top: 10px;
-      right: 10px;
-      border-top: 3px solid #4CAF50;
-      border-right: 3px solid #4CAF50;
+      top: 0;
+      right: 0;
+      border-top: 2px solid #4CAF50;
+      border-right: 2px solid #4CAF50;
     }
-
+    
     .corner-bl {
-      bottom: 10px;
-      left: 10px;
-      border-bottom: 3px solid #4CAF50;
-      border-left: 3px solid #4CAF50;
+      bottom: 0;
+      left: 0;
+      border-bottom: 2px solid #4CAF50;
+      border-left: 2px solid #4CAF50;
+    }
+    
+    .corner-br {
+      bottom: 0;
+      right: 0;
+      border-bottom: 2px solid #4CAF50;
+      border-right: 2px solid #4CAF50;
     }
 
-    .corner-br {
-      bottom: 10px;
-      right: 10px;
-      border-bottom: 3px solid #4CAF50;
-      border-right: 3px solid #4CAF50;
+    /* MEDIA QUERY UNTUK CETAK/PDF */
+    @media print {
+      body {
+        margin: 0;
+        padding: 0;
+        width: 210mm;
+        height: 297mm;
+      }
+      
+      .container {
+        width: 210mm;
+        margin: 0;
+        padding: 15mm 18mm;
+      }
+      
+      .watermark {
+        opacity: 0.1;
+      }
+      
+      .stamp {
+        transform: rotate(15deg);
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+      }
     }
   </style>
 </head>
 
 <body>
+  <div class="container">
+    <!-- WATERMARK -->
+    <div class="watermark">LUNAS ✓</div>
 
-  <!-- WATERMARK KEREN -->
-  <div class="watermark-pattern"></div>
-  <div class="watermark-circle"></div>
-  <div class="watermark">LUNAS ✓</div>
+    <!-- DEKORASI CORNER -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
 
-  <!-- CORNER DECORATIONS -->
-  <div class="corner-decoration corner-tl"></div>
-  <div class="corner-decoration corner-tr"></div>
-  <div class="corner-decoration corner-bl"></div>
-  <div class="corner-decoration corner-br"></div>
+    <!-- STAMP LUNAS -->
+    {{-- <div class="stamp">
+      ✓ LUNAS<br>
+      <span style="font-size: 12px;">OSMAN COURSE</span>
+    </div> --}}
 
-  <!-- STAMP LUNAS -->
-  <div class="stamp">
-    ✓ LUNAS<br>
-    <span style="font-size: 14px;">OSMAN COURSE</span>
-  </div>
+    <!-- HEADER -->
+    <div class="header">
+      <h1>KUITANSI PEMBAYARAN</h1>
+      <p>Osman Course Center - Jl. Pendidikan No. 123, Jakarta</p>
+      <p>📞 (021) 123-4567 | ✉️ info@osmancourse.com</p>
+      <div class="header-decoration"></div>
+    </div>
 
-  <!-- HEADER -->
-  <div class="header">
-    <h1>KUITANSI PEMBAYARAN</h1>
-    <p>Osman Course Center - Jl. Pendidikan No. 123, Jakarta</p>
-    <p>📞 (021) 123-4567 | ✉️ info@osmancourse.com</p>
-    <div class="header-decoration"></div>
-  </div>
+    <!-- INFOBOX -->
+    <div class="info-box">
+      <table>
+        <tr>
+          <td><strong>No. Kuitansi</strong></td>
+          <td>: KTN/{{ $pembayaran->id }}/{{ now()->format('Ym') }}</td>
+        </tr>
+        <tr>
+          <td><strong>Tanggal</strong></td>
+          <td>: {{ $tanggal_sekarang }}</td>
+        </tr>
+        <tr>
+          <td><strong>Jam</strong></td>
+          <td>: {{ $jam_sekarang }}</td>
+        </tr>
+      </table>
+    </div>
 
-  <!-- INFOBOX -->
-  <div class="info-box">
-    <table>
-      <tr><td><strong>No. Kuitansi</strong></td><td>: KTN/{{ $pembayaran->id }}/{{ now()->format('Ym') }}</td></tr>
-      <tr><td><strong>Tanggal</strong></td><td>: {{ $tanggal_sekarang }}</td></tr>
-      <tr><td><strong>Jam</strong></td><td>: {{ $jam_sekarang }}</td></tr>
-    </table>
-  </div>
-
-  <!-- CONTENT -->
-  <div class="content">
+    <!-- INFORMASI PEMBAYARAN -->
     <table class="info-table">
-      <tr><th>Nama Murid</th><td>{{ $pembayaran->user->nama }}</td></tr>
-      <tr><th>Email</th><td>{{ $pembayaran->user->email }}</td></tr>
-      <tr><th>Keterangan</th><td>{{ $pembayaran->keterangan }}</td></tr>
+      <tr>
+        <th>Nama Murid</th>
+        <td>{{ $pembayaran->user->nama }}</td>
+      </tr>
+      <tr>
+        <th>Email</th>
+        <td>{{ $pembayaran->user->email }}</td>
+      </tr>
+      <tr>
+        <th>Keterangan</th>
+        <td>{{ $pembayaran->keterangan }}</td>
+      </tr>
       @if($pembayaran->range_bulan)
-      <tr><th>Periode</th><td>{{ $pembayaran->range_bulan }}</td></tr>
+      <tr>
+        <th>Periode</th>
+        <td>{{ $pembayaran->range_bulan }}</td>
+      </tr>
       @endif
-      <tr><th>Metode Pembayaran</th><td>{{ $pembayaran->metode }}</td></tr>
-      <tr><th>Status</th><td><strong style="color: #4CAF50;">{{ strtoupper($pembayaran->jenis_bayar) }}</strong></td></tr>
+      <tr>
+        <th>Metode Pembayaran</th>
+        <td>{{ $pembayaran->metode }}</td>
+      </tr>
+      <tr>
+        <th>Status</th>
+        <td><span class="status-badge">{{ strtoupper($pembayaran->jenis_bayar) }}</span></td>
+      </tr>
     </table>
 
+    <!-- JUMLAH PEMBAYARAN -->
     <div class="jumlah-section">
-      <div style="font-size: 16px; color: #666;">Jumlah Pembayaran</div>
+      <div class="jumlah-label">Jumlah Pembayaran</div>
       <div class="nominal">Rp {{ number_format($pembayaran->jumlah,0,',','.') }}</div>
     </div>
 
-    <div style="font-size:14px; background: #f8fff8; padding: 12px; border-radius: 6px; border-left: 4px solid #4CAF50;">
+    <!-- TERBILANG -->
+    <div class="terbilang">
       <strong>Terbilang:</strong> <em>{{ \App\Helpers\Terbilang::make($pembayaran->jumlah) }} Rupiah</em>
     </div>
-  </div>
 
-  <!-- TTD -->
-  <div class="ttd-center">
-    <img src="https://res.cloudinary.com/dunynusuh/image/upload/v1761883622/barcode_ttg_admin_krwhcb.png" class="qr-ttd">
-    <div class="ttd-line"></div>
-    <div class="nama-ttd">{{ $pembayaran->admin->nama ?? 'Administrasi' }}</div>
-    <div style="font-size: 14px; color: #666;">Admin Osman Course</div>
-  </div>
+    <!-- TANDA TANGAN -->
+    <div class="ttd-section">
+      <img src="https://res.cloudinary.com/dunynusuh/image/upload/v1761883622/barcode_ttg_admin_krwhcb.png" 
+           class="qr-ttd" 
+           alt="QR Code Tanda Tangan">
+      <div class="ttd-line"></div>
+      <div class="nama-ttd">{{ $pembayaran->admin->nama ?? 'Administrasi' }}</div>
+      <div class="jabatan-ttd">Admin Osman Course</div>
+    </div>
 
-  <!-- FOOTER -->
-  <div class="footer">
-    <strong>Kuitansi ini sah dan diterbitkan oleh sistem Osman Course</strong><br>
-    Dicetak pada: {{ $tanggal_sekarang }} pukul {{ $jam_sekarang }}
+    <!-- FOOTER -->
+    <div class="footer">
+      <strong>Kuitansi ini sah dan diterbitkan oleh sistem Osman Course</strong><br>
+      Dicetak pada: {{ $tanggal_sekarang }} pukul {{ $jam_sekarang }}
+    </div>
   </div>
-
 </body>
 </html>
 {{-- data:image/png;base64,{{ $qrCode }} --}}
