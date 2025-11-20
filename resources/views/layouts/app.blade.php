@@ -1145,6 +1145,12 @@
                         <span>Riwayat</span>
                     </a>
                 </div>
+                <div class="nav-item">
+                  <a class="nav-link {{ request()->routeIs('murid.laporan.*') ? 'active' : '' }}" href="{{ route('murid.laporan.index') }}">
+                      <i class="bi bi-file-earmark-text"></i>
+                      <span>Laporan & Bukti</span>
+                  </a>
+              </div>
             </div>
 
             <div class="nav-section">

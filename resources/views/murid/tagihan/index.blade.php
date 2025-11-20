@@ -10,11 +10,11 @@
         <div class="d-flex align-items-center">
             <div class="bg-primary rounded p-2 me-3">
                 <i class="bi bi-receipt text-white fs-4"></i>
-                @if($tagihan->count() > 0)
+                {{-- @if($tagihan->count() > 0)
                 <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
                     {{ $tagihan->count() }}
                 </span>
-                @endif
+                @endif --}}
             </div>
             <div>
                 <h4 class="mb-0 fw-bold">Tagihan Saya</h4>

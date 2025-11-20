@@ -946,4 +946,138 @@ class MuridController extends Controller
 
         return redirect()->route('murid.profile')->with('success', 'Profile berhasil diperbarui!');
     }
+
+    // Tambahkan method-method berikut di MuridController
+
+    public function laporanIndex()
+    {
+        $user = auth()->user();
+        $tahun = request('tahun', $this->getTahunSekarang());
+        
+        // Gunakan trait method untuk tahun tersedia
+        $tahunTersedia = $this->getTahunTersedia($user->id);
+        $tahunUntukSelect = $this->getTahunUntukSelect(2024, 2030);
+
+        // Data SPP untuk tahun tertentu
+        $dataSpp = $this->getDataSppMurid($user, $tahun);
+        
+        // Data Tagihan non-SPP untuk tahun tertentu
+        $dataTagihan = $this->getDataTagihanMurid($user, $tahun);
+
+        return view('murid.laporan.index', compact(
+            'tahun',
+            'tahunTersedia',
+            'tahunUntukSelect',
+            'dataSpp',
+            'dataTagihan',
+            'user'
+        ));
+    }
+
+    private function getDataSppMurid($user, $tahun)
+    {
+        $sppSetting = SppSetting::latest()->first();
+        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        
+        // Inisialisasi data bulan
+        $bulanData = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $bulanData[$i] = [
+                'status' => 'BELUM',
+                'total_dibayar' => 0,
+                'pembayaran' => []
+            ];
+        }
+
+        // Ambil semua pembayaran SPP yang diterima untuk tahun tertentu
+        $pembayaranSpp = Pembayaran::where('user_id', $user->id)
+            ->where('status', 'accepted')
+            ->whereNull('tagihan_id')
+            ->where('tahun', $tahun)
+            ->orderBy('tanggal_proses', 'asc')
+            ->get();
+
+        // Proses setiap pembayaran
+        foreach ($pembayaranSpp as $pembayaran) {
+            if ($pembayaran->bulan_mulai && $pembayaran->bulan_akhir) {
+                $jumlahBulan = ($pembayaran->bulan_akhir - $pembayaran->bulan_mulai) + 1;
+                $jumlahPerBulan = $pembayaran->jumlah / $jumlahBulan;
+                
+                for ($bulan = $pembayaran->bulan_mulai; $bulan <= $pembayaran->bulan_akhir; $bulan++) {
+                    if ($bulan >= 1 && $bulan <= 12) {
+                        $bulanData[$bulan]['total_dibayar'] += $jumlahPerBulan;
+                        $bulanData[$bulan]['pembayaran'][] = [
+                            'id' => $pembayaran->id,
+                            'jumlah' => $jumlahPerBulan,
+                            'tanggal' => $pembayaran->tanggal_proses,
+                            'metode' => $pembayaran->metode,
+                            'jenis_bayar' => $pembayaran->jenis_bayar
+                        ];
+
+                        // Update status berdasarkan kondisi aktual
+                        if ($bulanData[$bulan]['total_dibayar'] >= $nominalSpp) {
+                            $bulanData[$bulan]['status'] = 'LUNAS';
+                        } elseif ($bulanData[$bulan]['total_dibayar'] > 0) {
+                            $bulanData[$bulan]['status'] = 'CICILAN';
+                        }
+                    }
+                }
+            }
+        }
+
+        return [
+            'murid' => $user,
+            'bulan' => $bulanData,
+            'nominal_spp' => $nominalSpp
+        ];
+    }
+
+    private function getDataTagihanMurid($user, $tahun)
+    {
+        return Tagihan::where('user_id', $user->id)
+            ->where('jenis', '!=', 'spp') // Hanya non-SPP
+            ->whereYear('created_at', $tahun)
+            ->with(['pembayaran' => function($query) {
+                $query->where('status', 'accepted');
+            }])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function($tagihan) {
+                $totalDibayar = $tagihan->pembayaran->sum('jumlah');
+                $status = 'BELUM';
+                
+                if ($totalDibayar >= $tagihan->jumlah) {
+                    $status = 'LUNAS';
+                } elseif ($totalDibayar > 0) {
+                    $status = 'CICILAN';
+                }
+                
+                // Tambahkan properti tambahan untuk view
+                $tagihan->status_detail = $status;
+                $tagihan->total_dibayar = $totalDibayar;
+                $tagihan->sisa_tagihan = max(0, $tagihan->jumlah - $totalDibayar);
+                
+                return $tagihan;
+            });
+    }
+
+    // Ganti method export yang lama dengan ini:
+    public function exportLaporan($tahun)
+    {
+        $user = auth()->user();
+        $dataSpp = $this->getDataSppMurid($user, $tahun);
+        $dataTagihan = $this->getDataTagihanMurid($user, $tahun);
+        
+        $pdf = Pdf::loadView('murid.laporan.export-laporan-pdf', [
+            'dataSpp' => $dataSpp,
+            'dataTagihan' => $dataTagihan,
+            'tahun' => $tahun,
+            'user' => $user,
+            'tanggalExport' => now()
+        ])->setPaper('a4', 'portrait');
+        
+        $filename = "Laporan-Keuangan-{$user->nama}-{$tahun}.pdf";
+        
+        return $pdf->download($filename);
+    }
 }

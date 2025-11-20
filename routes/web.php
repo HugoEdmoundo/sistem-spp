@@ -133,6 +133,10 @@ Route::middleware(['auth', 'murid'])->prefix('murid')->group(function () {
     // Route untuk upload bukti SPP  
     Route::post('/spp/upload-bukti', [MuridController::class, 'uploadBuktiSpp'])
         ->name('murid.spp.upload-bukti');
+
+    Route::get('/laporan', [MuridController::class, 'laporanIndex'])->name('murid.laporan.index');
+    Route::get('/laporan/export/{tahun}', [MuridController::class, 'exportLaporan'])->name('murid.laporan.export');
+    
 });
 
 // Validation Route - PERBAIKI: tambahkan use statement untuk Request
