@@ -27,217 +27,456 @@ class MuridController extends Controller
     public function dashboard()
     {   
         $user = auth()->user();
+        $tahunSekarang = date('Y');
         
-        // Hitung statistik TAGIHAN
-        $totalTagihan = Tagihan::where('user_id', $user->id)
-            ->whereIn('status', ['unpaid', 'partial'])
-            ->sum('jumlah');
-            
-        $tagihanUnpaidCount = Tagihan::where('user_id', $user->id)
-            ->where('status', 'unpaid')
-            ->count();
-            
-        $tagihanPartialCount = Tagihan::where('user_id', $user->id)
-            ->where('status', 'partial')
-            ->count();
+        try {
+            DB::beginTransaction();
 
-        $totalTagihanNotif = $tagihanUnpaidCount + $tagihanPartialCount;
+            // ==================== STATISTIK TAGIHAN ====================
+            $totalTagihan = Tagihan::where('user_id', $user->id)
+                ->whereIn('status', ['unpaid', 'partial'])
+                ->sum('jumlah');
+                
+            $tagihanUnpaidCount = Tagihan::where('user_id', $user->id)
+                ->where('status', 'unpaid')
+                ->count();
+                
+            $tagihanPartialCount = Tagihan::where('user_id', $user->id)
+                ->where('status', 'partial')
+                ->count();
 
-        // Hitung statistik PEMBAYARAN
-        $totalDibayar = Pembayaran::where('user_id', $user->id)
-            ->whereIn('status', ['accepted', 'partial'])
-            ->sum('jumlah');
-            
-        $pembayaranPendingCount = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->count();
+            $totalTagihanNotif = $tagihanUnpaidCount + $tagihanPartialCount;
 
-        $pembayaranRejectedCount = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'rejected')
-            ->count();
+            // ==================== STATISTIK PEMBAYARAN ====================
+            $totalDibayar = Pembayaran::where('user_id', $user->id)
+                ->whereIn('status', ['accepted', 'partial'])
+                ->sum('jumlah');
+                
+            $pembayaranPendingCount = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->count();
 
-        $pembayaranPartialCount = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'accepted')
-            ->where('jenis_bayar', 'cicilan')
-            ->count();
+            $pembayaranRejectedCount = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'rejected')
+                ->count();
 
-        // Total notifikasi
-        $totalNotifikasi = $pembayaranPendingCount + $pembayaranRejectedCount + $pembayaranPartialCount + $totalTagihanNotif;
+            $pembayaranPartialCount = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'accepted')
+                ->where('jenis_bayar', 'cicilan')
+                ->count();
 
-        // Ambil data untuk ditampilkan
-        $tagihanUnpaid = Tagihan::where('user_id', $user->id)
-            ->where('status', 'unpaid')
-            ->latest()
-            ->take(5)
-            ->get();
+            // ==================== STATISTIK SPP ====================
+            // Total SPP yang sudah dibayar (diterima) untuk tahun berjalan
+            $totalSppDibayar = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'accepted')
+                ->whereNull('tagihan_id') // Hanya SPP murni
+                ->where('tahun', $tahunSekarang)
+                ->sum('jumlah');
 
-        $tagihanPartial = Tagihan::where('user_id', $user->id)
-            ->where('status', 'partial')
-            ->with(['pembayaran' => function($query) {
-                $query->whereIn('status', ['accepted', 'partial']);
-            }])
-            ->latest()
-            ->take(5)
-            ->get();
+            // Status SPP detail untuk tahun berjalan
+            $statusSppTahunIni = $user->getStatusSppTahunanDetail($tahunSekarang);
 
-        // Ambil SPP cicilan
-        $sppCicilanPayments = Pembayaran::where('user_id', $user->id)
-            ->whereNull('tagihan_id')
-            ->where('status', 'accepted')
-            ->where('jenis_bayar', 'cicilan')
-            ->latest()
-            ->take(5)
-            ->get();
+            // ==================== PERHITUNGAN NOTIFIKASI ====================
+            // Hitung total item yang perlu tindakan
+            $totalNotifikasi = $tagihanUnpaidCount + $tagihanPartialCount + $pembayaranPendingCount + $pembayaranRejectedCount;
 
-        // Buat array sederhana untuk SPP cicilan
-        $sppCicilanArray = [];
-        foreach ($sppCicilanPayments as $sppPayment) {
-            $sppAsTagihan = $this->createSimpleVirtualTagihan($sppPayment);
-            if ($sppAsTagihan && ($sppAsTagihan['is_cicilan'] ?? false)) {
-                $sppCicilanArray[] = $sppAsTagihan;
+            // ==================== DATA UNTUK DITAMPILKAN ====================
+            // Tagihan belum bayar
+            $tagihanUnpaid = Tagihan::where('user_id', $user->id)
+                ->where('status', 'unpaid')
+                ->with(['pembayaran' => function($query) {
+                    $query->whereIn('status', ['accepted', 'pending', 'rejected']);
+                }])
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function($tagihan) {
+                    return $this->enhanceTagihanData($tagihan);
+                });
+
+            // Tagihan cicilan
+            $tagihanPartial = Tagihan::where('user_id', $user->id)
+                ->where('status', 'partial')
+                ->with(['pembayaran' => function($query) {
+                    $query->whereIn('status', ['accepted', 'partial']);
+                }])
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function($tagihan) {
+                    return $this->enhanceTagihanData($tagihan);
+                });
+
+            // Ambil SPP cicilan (pembayaran SPP murni yang cicilan)
+            $sppCicilanPayments = Pembayaran::where('user_id', $user->id)
+                ->whereNull('tagihan_id')
+                ->where('status', 'accepted')
+                ->where('jenis_bayar', 'cicilan')
+                ->where('tahun', $tahunSekarang)
+                ->latest()
+                ->take(5)
+                ->get();
+
+            // Buat virtual tagihan untuk SPP cicilan
+            $sppCicilanArray = [];
+            foreach ($sppCicilanPayments as $sppPayment) {
+                $sppAsTagihan = $this->createVirtualTagihanFromSpp($sppPayment);
+                if ($sppAsTagihan) {
+                    $sppCicilanArray[] = $sppAsTagihan;
+                }
             }
+
+            // Pembayaran pending
+            $pembayaranPending = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->with(['tagihan', 'admin'])
+                ->latest()
+                ->take(5)
+                ->get();
+
+            // Pembayaran ditolak
+            $pembayaranRejected = Pembayaran::where('user_id', $user->id)
+                ->where('status', 'rejected')
+                ->with(['tagihan', 'admin'])
+                ->latest()
+                ->take(5)
+                ->get();
+
+            // Gabungkan semua cicilan (tagihan partial + SPP cicilan)
+            $allCicilan = collect();
+            
+            // Tambahkan tagihan partial biasa
+            foreach ($tagihanPartial as $tagihan) {
+                $allCicilan->push($tagihan);
+            }
+            
+            // Tambahkan SPP cicilan
+            foreach ($sppCicilanArray as $sppCicilan) {
+                $allCicilan->push((object)$sppCicilan);
+            }
+            
+            // Ambil 5 teratas
+            $allCicilan = $allCicilan->take(5);
+
+            // Ambil nominal SPP saat ini
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+
+            // Ambil riwayat pembayaran terbaru
+            $riwayatPembayaran = Pembayaran::where('user_id', $user->id)
+                ->with(['tagihan', 'admin'])
+                ->latest()
+                ->take(5)
+                ->get();
+
+            // Ambil tagihan untuk section tagihan terbaru
+            $tagihanTerbaru = Tagihan::where('user_id', $user->id)
+                ->with(['pembayaran' => function($query) {
+                    $query->whereIn('status', ['accepted', 'pending', 'rejected']);
+                }])
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function($tagihan) {
+                    return $this->enhanceTagihanData($tagihan);
+                });
+
+            DB::commit();
+
+            return view('murid.dashboard', [
+                // Statistik utama
+                'totalTagihan' => $totalTagihan,
+                'totalDibayar' => $totalDibayar,
+                'tagihanUnpaidCount' => $tagihanUnpaidCount,
+                'tagihanPartialCount' => $tagihanPartialCount,
+                'totalTagihanNotif' => $totalTagihanNotif,
+                'pembayaranPendingCount' => $pembayaranPendingCount,
+                'pembayaranRejectedCount' => $pembayaranRejectedCount,
+                'pembayaranPartialCount' => $pembayaranPartialCount,
+                'totalNotifikasi' => $totalNotifikasi,
+                
+                // Data SPP
+                'totalSppDibayar' => $totalSppDibayar,
+                'totalSppDibayarFormatted' => 'Rp ' . number_format($totalSppDibayar, 0, ',', '.'),
+                'statusSppTahunIni' => $statusSppTahunIni,
+                'nominalSpp' => $nominalSpp,
+                
+                // Data collections
+                'tagihanUnpaid' => $tagihanUnpaid,
+                'tagihanPartial' => $allCicilan,
+                'pembayaranPending' => $pembayaranPending,
+                'pembayaranRejected' => $pembayaranRejected,
+                'riwayatPembayaran' => $riwayatPembayaran,
+                'tagihanTerbaru' => $tagihanTerbaru,
+                
+                // Tahun
+                'tahunSekarang' => $tahunSekarang,
+                'user' => $user
+            ]);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            \Log::error('Error in MuridController@dashboard: ' . $e->getMessage());
+            
+            // Fallback view dengan data minimal
+            return view('murid.dashboard', [
+                'totalTagihan' => 0,
+                'totalDibayar' => 0,
+                'tagihanUnpaidCount' => 0,
+                'tagihanPartialCount' => 0,
+                'totalTagihanNotif' => 0,
+                'pembayaranPendingCount' => 0,
+                'pembayaranRejectedCount' => 0,
+                'pembayaranPartialCount' => 0,
+                'totalNotifikasi' => 0,
+                'totalSppDibayar' => 0,
+                'totalSppDibayarFormatted' => 'Rp 0',
+                'statusSppTahunIni' => ['semua_bulan' => []],
+                'nominalSpp' => 0,
+                'tagihanUnpaid' => collect(),
+                'tagihanPartial' => collect(),
+                'pembayaranPending' => collect(),
+                'pembayaranRejected' => collect(),
+                'riwayatPembayaran' => collect(),
+                'tagihanTerbaru' => collect(),
+                'tahunSekarang' => $tahunSekarang,
+                'user' => $user
+            ])->with('error', 'Terjadi kesalahan saat memuat dashboard: ' . $e->getMessage());
         }
-
-        $pembayaranPending = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'pending')
-            ->latest()
-            ->take(5)
-            ->get();
-
-        $pembayaranRejected = Pembayaran::where('user_id', $user->id)
-            ->where('status', 'rejected')
-            ->latest()
-            ->take(5)
-            ->get();
-
-        // Gabungkan dengan cara manual
-        $allCicilan = collect();
-        
-        // Tambahkan tagihan partial biasa
-        foreach ($tagihanPartial as $tagihan) {
-            $allCicilan->push($tagihan);
-        }
-        
-        // Tambahkan SPP cicilan
-        foreach ($sppCicilanArray as $sppCicilan) {
-            $allCicilan->push((object)$sppCicilan);
-        }
-        
-        // Ambil 5 teratas
-        $allCicilan = $allCicilan->take(5);
-
-        // Ambil nominal SPP saat ini
-        $sppSetting = SppSetting::latest()->first();
-        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
-
-        // Ambil riwayat pembayaran terbaru
-        $riwayatPembayaran = Pembayaran::where('user_id', $user->id)
-            ->latest()
-            ->take(5)
-            ->get();
-
-        // Ambil tagihan untuk section tagihan terbaru
-        $tagihanTerbaru = Tagihan::where('user_id', $user->id)
-            ->latest()
-            ->take(5)
-            ->get();
-
-        return view('murid.dashboard', [
-            'totalTagihan' => $totalTagihan,
-            'totalDibayar' => $totalDibayar,
-            'tagihanUnpaidCount' => $tagihanUnpaidCount,
-            'tagihanPartialCount' => $tagihanPartialCount + count($sppCicilanArray),
-            'totalTagihanNotif' => $totalTagihanNotif,
-            'pembayaranPendingCount' => $pembayaranPendingCount,
-            'pembayaranRejectedCount' => $pembayaranRejectedCount,
-            'pembayaranPartialCount' => $pembayaranPartialCount,
-            'totalNotifikasi' => $totalNotifikasi,
-            'tagihanUnpaid' => $tagihanUnpaid,
-            'tagihanPartial' => $allCicilan,
-            'pembayaranPending' => $pembayaranPending,
-            'pembayaranRejected' => $pembayaranRejected,
-            'nominalSpp' => $nominalSpp,
-            'riwayatPembayaran' => $riwayatPembayaran,
-            'tagihanTerbaru' => $tagihanTerbaru
-        ]);
     }
 
-    private function createSimpleVirtualTagihan($sppPayment)
+    /**
+     * Enhance tagihan data dengan calculated fields
+     */
+    private function enhanceTagihanData($tagihan)
     {
-        $sppSetting = SppSetting::latest()->first();
-        $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+        if (!$tagihan) return null;
+
+        $totalDibayar = $tagihan->pembayaran
+            ->where('status', 'accepted')
+            ->sum('jumlah');
+
+        $sisaTagihan = max(0, $tagihan->jumlah - $totalDibayar);
+        $persentaseDibayar = $tagihan->jumlah > 0 ? ($totalDibayar / $tagihan->jumlah) * 100 : 0;
         
-        $bulanMulai = $sppPayment->bulan_mulai;
-        $bulanAkhir = $sppPayment->bulan_akhir;
-        $tahun = $sppPayment->tahun;
+        // Cek apakah ada pembayaran pending
+        $adaPending = $tagihan->pembayaran
+            ->where('status', 'pending')
+            ->isNotEmpty();
+
+        $bisaBayar = !$tagihan->is_lunas && !$adaPending && $sisaTagihan > 0;
+        $minimalBayar = max(1000, $sisaTagihan * 0.1);
+
+        // Tambahkan calculated fields
+        $tagihan->total_dibayar = $totalDibayar;
+        $tagihan->sisa_tagihan = $sisaTagihan;
+        $tagihan->persentase_dibayar = $persentaseDibayar;
+        $tagihan->bisa_bayar = $bisaBayar;
+        $tagihan->minimal_bayar = $minimalBayar;
+        $tagihan->ada_pending = $adaPending;
         
-        if (!$bulanMulai || !$bulanAkhir) {
+        // Format fields
+        $tagihan->jumlah_formatted = 'Rp ' . number_format($tagihan->jumlah, 0, ',', '.');
+        $tagihan->total_dibayar_formatted = 'Rp ' . number_format($totalDibayar, 0, ',', '.');
+        $tagihan->sisa_tagihan_formatted = 'Rp ' . number_format($sisaTagihan, 0, ',', '.');
+        $tagihan->minimal_bayar_formatted = 'Rp ' . number_format($minimalBayar, 0, ',', '.');
+
+        return $tagihan;
+    }
+
+    /**
+     * Create virtual tagihan from SPP payment
+     */
+    private function createVirtualTagihanFromSpp($sppPayment)
+    {
+        try {
+            $sppSetting = SppSetting::latest()->first();
+            $nominalSpp = $sppSetting ? $sppSetting->nominal : 0;
+            
+            $bulanMulai = $sppPayment->bulan_mulai;
+            $bulanAkhir = $sppPayment->bulan_akhir;
+            $tahun = $sppPayment->tahun;
+            
+            if (!$bulanMulai || !$bulanAkhir) {
+                return null;
+            }
+
+            $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
+            $totalTagihan = $nominalSpp * $jumlahBulan;
+            
+            // Hitung total sudah dibayar untuk SPP periode ini
+            $totalDibayar = Pembayaran::where('user_id', $sppPayment->user_id)
+                ->whereNull('tagihan_id')
+                ->where('tahun', $tahun)
+                ->where('bulan_mulai', $bulanMulai)
+                ->where('bulan_akhir', $bulanAkhir)
+                ->where('status', 'accepted')
+                ->sum('jumlah');
+
+            $sisaTagihan = $totalTagihan - $totalDibayar;
+            
+            // Status berdasarkan kondisi aktual
+            $isLunas = $sisaTagihan <= 0;
+            $isPending = Pembayaran::where('user_id', $sppPayment->user_id)
+                ->whereNull('tagihan_id')
+                ->where('tahun', $tahun)
+                ->where('bulan_mulai', $bulanMulai)
+                ->where('bulan_akhir', $bulanAkhir)
+                ->where('status', 'pending')
+                ->exists();
+                
+            $isRejected = Pembayaran::where('user_id', $sppPayment->user_id)
+                ->whereNull('tagihan_id')
+                ->where('tahun', $tahun)
+                ->where('bulan_mulai', $bulanMulai)
+                ->where('bulan_akhir', $bulanAkhir)
+                ->where('status', 'rejected')
+                ->exists();
+                
+            $isCicilan = $totalDibayar > 0 && $totalDibayar < $totalTagihan;
+            $bisaBayar = $sisaTagihan > 0 && !$isPending;
+
+            $persentaseDibayar = $totalTagihan > 0 ? ($totalDibayar / $totalTagihan) * 100 : 0;
+            $minimalBayar = max(1000, $sisaTagihan * 0.1);
+            
+            // Return array sebagai virtual tagihan
+            return [
+                'id' => 'spp_' . $sppPayment->id,
+                'jenis' => 'spp',
+                'keterangan' => 'SPP ' . $jumlahBulan . ' bulan (' . 
+                    User::getNamaBulanStatic($bulanMulai) . ' - ' . 
+                    User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun . ')',
+                'jumlah' => $totalTagihan,
+                'status' => $isLunas ? 'success' : ($isRejected ? 'rejected' : 'partial'),
+                'created_at' => $sppPayment->created_at,
+                'is_virtual' => true,
+                'total_dibayar' => $totalDibayar,
+                'sisa_tagihan' => $sisaTagihan,
+                'persentase_dibayar' => $persentaseDibayar,
+                'is_lunas' => $isLunas,
+                'is_pending' => $isPending,
+                'is_cicilan' => $isCicilan,
+                'is_rejected' => $isRejected,
+                'bisa_bayar' => $bisaBayar,
+                'minimal_bayar' => $minimalBayar,
+                'jumlah_formatted' => 'Rp ' . number_format($totalTagihan, 0, ',', '.'),
+                'total_dibayar_formatted' => 'Rp ' . number_format($totalDibayar, 0, ',', '.'),
+                'sisa_tagihan_formatted' => 'Rp ' . number_format($sisaTagihan, 0, ',', '.'),
+                'minimal_bayar_formatted' => 'Rp ' . number_format($minimalBayar, 0, ',', '.'),
+                'pembayaran' => collect([$sppPayment]) // Simulate pembayaran relationship
+            ];
+
+        } catch (Exception $e) {
+            \Log::error('Error creating virtual tagihan: ' . $e->getMessage());
             return null;
         }
+    }
 
-        $jumlahBulan = ($bulanAkhir - $bulanMulai) + 1;
-        $totalTagihan = $nominalSpp * $jumlahBulan;
-        
-        // Hitung total sudah dibayar untuk SPP periode ini
-        $totalDibayar = Pembayaran::where('user_id', $sppPayment->user_id)
-            ->whereNull('tagihan_id')
-            ->where('tahun', $tahun)
-            ->where('bulan_mulai', $bulanMulai)
-            ->where('bulan_akhir', $bulanAkhir)
-            ->where('status', 'accepted')
-            ->sum('jumlah');
+    /**
+     * Get dashboard data for API (optional)
+     */
+    public function getDashboardData()
+    {
+        try {
+            $data = $this->dashboardData();
+            return response()->json([
+                'success' => true,
+                'data' => $data
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memuat data dashboard',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
-        $sisaTagihan = $totalTagihan - $totalDibayar;
+    /**
+     * Extract dashboard data logic for reuse
+     */
+    private function dashboardData()
+    {
+        $user = auth()->user();
+        $tahunSekarang = date('Y');
         
-        // Status berdasarkan kondisi aktual
-        $isLunas = $sisaTagihan <= 0;
-        $isPending = Pembayaran::where('user_id', $sppPayment->user_id)
-            ->whereNull('tagihan_id')
-            ->where('tahun', $tahun)
-            ->where('bulan_mulai', $bulanMulai)
-            ->where('bulan_akhir', $bulanAkhir)
-            ->where('status', 'pending')
-            ->exists();
-            
-        $isRejected = Pembayaran::where('user_id', $sppPayment->user_id)
-            ->whereNull('tagihan_id')
-            ->where('tahun', $tahun)
-            ->where('bulan_mulai', $bulanMulai)
-            ->where('bulan_akhir', $bulanAkhir)
-            ->where('status', 'rejected')
-            ->exists();
-            
-        $isCicilan = $totalDibayar > 0 && $totalDibayar < $totalTagihan;
-        $bisaBayar = $sisaTagihan > 0 && !$isPending;
+        // Basic statistics
+        $stats = [
+            'totalTagihan' => Tagihan::where('user_id', $user->id)
+                ->whereIn('status', ['unpaid', 'partial'])
+                ->sum('jumlah'),
+            'tagihanUnpaidCount' => Tagihan::where('user_id', $user->id)
+                ->where('status', 'unpaid')
+                ->count(),
+            'tagihanPartialCount' => Tagihan::where('user_id', $user->id)
+                ->where('status', 'partial')
+                ->count(),
+            'totalDibayar' => Pembayaran::where('user_id', $user->id)
+                ->whereIn('status', ['accepted', 'partial'])
+                ->sum('jumlah'),
+            'pembayaranPendingCount' => Pembayaran::where('user_id', $user->id)
+                ->where('status', 'pending')
+                ->count(),
+            'pembayaranRejectedCount' => Pembayaran::where('user_id', $user->id)
+                ->where('status', 'rejected')
+                ->count(),
+            'totalSppDibayar' => Pembayaran::where('user_id', $user->id)
+                ->where('status', 'accepted')
+                ->whereNull('tagihan_id')
+                ->where('tahun', $tahunSekarang)
+                ->sum('jumlah')
+        ];
 
-        $persentaseDibayar = $totalTagihan > 0 ? ($totalDibayar / $totalTagihan) * 100 : 0;
-        $minimalBayar = max(1000, $sisaTagihan * 0.1);
+        $stats['totalNotifikasi'] = $stats['tagihanUnpaidCount'] + $stats['tagihanPartialCount'] + 
+                                  $stats['pembayaranPendingCount'] + $stats['pembayaranRejectedCount'];
+
+        return $stats;
+    }
+
+    /**
+     * Get recent activities for dashboard
+     */
+    public function getRecentActivities()
+    {
+        $user = auth()->user();
         
-        // Return array sederhana
+        $recentPayments = Pembayaran::where('user_id', $user->id)
+            ->with(['tagihan', 'admin'])
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(function($payment) {
+                return [
+                    'id' => $payment->id,
+                    'jumlah' => $payment->jumlah,
+                    'jumlah_formatted' => 'Rp ' . number_format($payment->jumlah, 0, ',', '.'),
+                    'status' => $payment->status,
+                    'status_label' => $payment->status_label,
+                    'metode' => $payment->metode,
+                    'keterangan' => $payment->keterangan,
+                    'tanggal_upload' => $payment->tanggal_upload?->format('d M Y H:i'),
+                    'tanggal_proses' => $payment->tanggal_proses?->format('d M Y H:i'),
+                    'is_spp' => is_null($payment->tagihan_id),
+                    'tagihan_keterangan' => $payment->tagihan?->keterangan,
+                    'admin_name' => $payment->admin?->nama
+                ];
+            });
+
+        $recentTagihan = Tagihan::where('user_id', $user->id)
+            ->with(['pembayaran'])
+            ->latest()
+            ->take(10)
+            ->get()
+            ->map(function($tagihan) {
+                return $this->enhanceTagihanData($tagihan);
+            });
+
         return [
-            'id' => 'spp_' . $sppPayment->id,
-            'jenis' => 'spp',
-            'keterangan' => 'SPP ' . $jumlahBulan . ' bulan (' . 
-                User::getNamaBulanStatic($bulanMulai) . ' - ' . 
-                User::getNamaBulanStatic($bulanAkhir) . ' ' . $tahun . ')',
-            'jumlah' => $totalTagihan,
-            'status' => $isLunas ? 'success' : ($isRejected ? 'rejected' : 'unpaid'),
-            'created_at' => $sppPayment->created_at,
-            'is_virtual' => true,
-            'total_dibayar' => $totalDibayar,
-            'sisa_tagihan' => $sisaTagihan,
-            'persentase_dibayar' => $persentaseDibayar,
-            'is_lunas' => $isLunas,
-            'is_pending' => $isPending,
-            'is_cicilan' => $isCicilan,
-            'is_rejected' => $isRejected,
-            'bisa_bayar' => $bisaBayar,
-            'minimal_bayar' => $minimalBayar,
-            'jumlah_formatted' => 'Rp ' . number_format($totalTagihan, 0, ',', '.'),
-            'total_dibayar_formatted' => 'Rp ' . number_format($totalDibayar, 0, ',', '.'),
-            'sisa_tagihan_formatted' => 'Rp ' . number_format($sisaTagihan, 0, ',', '.')
+            'recent_payments' => $recentPayments,
+            'recent_tagihan' => $recentTagihan
         ];
     }
+
 
     public function rekapSppSaya()
     {

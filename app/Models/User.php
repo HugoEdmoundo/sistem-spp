@@ -399,6 +399,9 @@ class User extends Authenticatable
     /**
      * Get status SPP dengan detail cicilan
      */
+    /**
+     * Get detailed SPP status for a specific year
+     */
     public function getStatusSppTahunanDetail($tahun): array
     {
         $bulanStatus = [];
@@ -408,6 +411,7 @@ class User extends Authenticatable
             $bulanStatus[$bulan] = [
                 'bulan' => $bulan,
                 'nama_bulan' => $this->getNamaBulan($bulan),
+                'nama_bulan_pendek' => substr($this->getNamaBulan($bulan), 0, 3),
                 'status' => 'unpaid', // unpaid, cicilan, paid
                 'total_tagihan' => 0,
                 'total_dibayar' => 0,
@@ -478,7 +482,10 @@ class User extends Authenticatable
             'belum_bayar' => array_values(array_filter($bulanStatus, function($item) {
                 return $item['status'] === 'unpaid';
             })),
-            'semua_bulan' => array_values($bulanStatus)
+            'semua_bulan' => array_values($bulanStatus),
+            'total_dibayar' => array_sum(array_column($bulanStatus, 'total_dibayar')),
+            'total_tagihan' => $nominalSpp * 12,
+            'persentase_keseluruhan' => $nominalSpp > 0 ? (array_sum(array_column($bulanStatus, 'total_dibayar')) / ($nominalSpp * 12)) * 100 : 0
         ];
     }
 

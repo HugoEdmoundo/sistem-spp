@@ -1136,7 +1136,7 @@
                 <div class="nav-item">
                     <a class="nav-link {{ request()->routeIs('murid.bayar.spp.page') ? 'active' : '' }}" href="{{ route('murid.bayar.spp.page') }}">
                         <i class="bi bi-credit-card"></i>
-                        <span>Buat Tagihan SPP</span>
+                        <span>Bayar SPP</span>
                     </a>
                 </div>
                 <div class="nav-item">
